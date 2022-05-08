@@ -1,2 +1,5 @@
 data/*.txt
 !data/conll2003.zip
+
+# model dumps
+*.model
