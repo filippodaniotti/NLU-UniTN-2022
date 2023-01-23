@@ -18,6 +18,8 @@ def get_collator(pad_token: int = 0) -> Callable:
         inputs = pad_sequence(inputs, batch_first = True, padding_value=pad_token)
         targets = pad_sequence(targets, batch_first = True, padding_value=pad_token)
 
+        return inputs, targets, lengths
+
     return collate_fn
 
 class SentsDataset(Dataset):

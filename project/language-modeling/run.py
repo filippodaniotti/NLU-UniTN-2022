@@ -1,10 +1,13 @@
+import os
 from argparse import ArgumentParser
 from datasets import load_dataset
 
 from torch.utils.data.dataloader import DataLoader
+import pytorch_lightning as pl
 
 from data import SentsDataset, get_collator
 from lang import Lang
+from models.lstm import BaseLSTM
 
 def get_data():
     DS_PATH = "penn_treebank"
@@ -25,10 +28,18 @@ def get_data():
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False, collate_fn=get_collator())
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=get_collator())
 
-    return train_loader, valid_loader, test_loader
+    return lang, train_loader, valid_loader, test_loader
 
 def train():
-    train_loader, valid_loader, test_loader = get_data() 
+    emb_dim = 300
+    hid_dim = 300
+    lang, train_loader, valid_loader, test_loader = get_data() 
+    # for v, t in enumerate(train_loader):
+    #     print(v)
+    # return 
+    trainer = pl.Trainer()
+    model = BaseLSTM(len(lang.words2ids), emb_dim, hid_dim)
+    trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=valid_loader)
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="Base interface")
