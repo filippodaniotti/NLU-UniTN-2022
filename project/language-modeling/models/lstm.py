@@ -1,12 +1,12 @@
-import torch
 import math
-from torch import nn
-from torchmetrics import Perplexity
+import torch
 import torch.nn.functional as F
+from torch import nn
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
-from typing import Callable, Union, List
+import pytorch_lightning as pl
 
+from typing import Callable, Union, List
 class BaseLSTM(pl.LightningModule):
     def __init__(
             self, 
@@ -40,25 +40,36 @@ class BaseLSTM(pl.LightningModule):
         return prediction, (hidden, cell)
         
     def training_step(self, batch, batch_idx):
-        inputs, targets, lengths = batch
-        outputs, _ = self(inputs, lengths)
-        targets = targets.view(-1)
-        loss = F.cross_entropy(outputs, targets, ignore_index=self.pad_value)
-        # logs metrics for each training_step,
-        # and the average across the epoch, to the progress bar and logger
-        self.log_dict({"train_loss": loss, "train_ppl": math.exp(loss)}, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-        return loss
+        return self.compute_forward_and_loss(batch)
 
+    def training_epoch_end(self, outputs):
+        self.compute_epoch_level_metrics(outputs, "Train")
+ 
     def validation_step(self, batch, batch_idx):
-        inputs, targets, lengths = batch
-        outputs, _ = self(inputs, lengths)
-        targets = targets.view(-1)
-        loss = F.cross_entropy(outputs, targets, ignore_index=self.pad_value)
-        # logs metrics for each training_step,
-        # and the average across the epoch, to the progress bar and logger
-        self.log_dict({"val_loss": loss, "val_ppl": math.exp(loss)}, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-        return loss
+        return self.compute_forward_and_loss(batch)
+
+    def validation_epoch_end(self, outputs) -> None:       
+        self.compute_epoch_level_metrics(outputs, "Validation")
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
+
+    def compute_forward_and_loss(self, batch):
+        inputs, targets, lengths = batch
+        outputs, _ = self(inputs, lengths)
+        targets = targets.view(-1)
+        loss = F.cross_entropy(outputs, targets, ignore_index=self.pad_value)
+        return {"loss": loss}
+
+    def compute_epoch_level_metrics(self, outputs, stage_name: str) -> None:
+        loss = torch.stack([x["loss"] for x in outputs]).mean()
+        self.logger.experiment.add_scalar(
+            f"Loss/{stage_name}",
+            loss,
+            self.current_epoch)
+         
+        self.logger.experiment.add_scalar(
+            f"Perplexity/{stage_name}",
+            math.exp(loss),
+            self.current_epoch)
