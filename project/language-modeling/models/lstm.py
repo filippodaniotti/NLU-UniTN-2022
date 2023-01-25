@@ -1,13 +1,9 @@
-import math
 import torch
-import torch.nn.functional as F
-from torch import nn
-from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+import torch.nn as nn
 
-import pytorch_lightning as pl
+from typing import Union, List
 
-from typing import Callable, Union, List
-class BaseLSTM(pl.LightningModule):
+class BaselineLSTM(nn.Module):
     def __init__(
             self, 
             num_classes: int, 
@@ -22,54 +18,42 @@ class BaseLSTM(pl.LightningModule):
         self.embedding_dim = embedding_dim
         self.pad_value = pad_value
 
-        self.embedding = nn.Embedding(num_classes, embedding_dim)
+        self.embedding = nn.Embedding(num_classes, embedding_dim, pad_value)
         self.lstm = nn.LSTM(embedding_dim, hidden_dim, num_layers=num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_dim, num_classes)
 
+        if init_weights:
+            self.init_weights()
+
     def forward(
             self, 
-            input: torch.Tensor, 
+            inputs: torch.Tensor, 
             lengths: List[int],
             hidden: Union[List[torch.Tensor], None] = None):
-        embedding = self.embedding(input)
-        packed_input = pack_padded_sequence(embedding, lengths, batch_first=True, enforce_sorted=False)
-        packed_output, (hidden, cell) = self.lstm(packed_input, hidden)    
-        output, output_lenghts = pad_packed_sequence(packed_output, batch_first=True)
-        prediction = self.fc(output)
+        embedding = self.embedding(inputs)
+        packed_inputs = nn.utils.rnn.pack_padded_sequence(embedding, lengths, batch_first=True, enforce_sorted=False)
+        packed_outputs, (hidden, cell) = self.lstm(packed_inputs, hidden)    
+        outputs, output_lenghts = nn.utils.rnn.pad_packed_sequence(packed_outputs, batch_first=True)
+        prediction = self.fc(outputs)
         prediction = prediction.reshape(-1, prediction.shape[2])
         return prediction, (hidden, cell)
-        
-    def training_step(self, batch, batch_idx):
-        return self.compute_forward_and_loss(batch)
 
-    def training_epoch_end(self, outputs):
-        self.compute_epoch_level_metrics(outputs, "Train")
- 
-    def validation_step(self, batch, batch_idx):
-        return self.compute_forward_and_loss(batch)
-
-    def validation_epoch_end(self, outputs) -> None:       
-        self.compute_epoch_level_metrics(outputs, "Validation")
-
-    def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
-        return optimizer
-
-    def compute_forward_and_loss(self, batch):
-        inputs, targets, lengths = batch
-        outputs, _ = self(inputs, lengths)
-        targets = targets.view(-1)
-        loss = F.cross_entropy(outputs, targets, ignore_index=self.pad_value)
-        return {"loss": loss}
-
-    def compute_epoch_level_metrics(self, outputs, stage_name: str) -> None:
-        loss = torch.stack([x["loss"] for x in outputs]).mean()
-        self.logger.experiment.add_scalar(
-            f"Loss/{stage_name}",
-            loss,
-            self.current_epoch)
-         
-        self.logger.experiment.add_scalar(
-            f"Perplexity/{stage_name}",
-            math.exp(loss),
-            self.current_epoch)
+    def init_weights(self):
+        for m in self.modules():
+            if type(m) in [nn.GRU, nn.LSTM, nn.RNN]:
+                for name, param in m.named_parameters():
+                    if 'weight_ih' in name:
+                        for idx in range(4):
+                            mul = param.shape[0]//4
+                            torch.nn.init.xavier_uniform_(param[idx*mul:(idx+1)*mul])
+                    elif 'weight_hh' in name:
+                        for idx in range(4):
+                            mul = param.shape[0]//4
+                            torch.nn.init.orthogonal_(param[idx*mul:(idx+1)*mul])
+                    elif 'bias' in name:
+                        param.data.fill_(0)
+            else:
+                if type(m) in [nn.Linear]:
+                    torch.nn.init.uniform_(m.weight, -0.01, 0.01)
+                    if m.bias != None:
+                        m.bias.data.fill_(0.01)

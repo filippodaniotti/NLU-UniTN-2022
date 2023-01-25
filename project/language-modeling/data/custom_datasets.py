@@ -1,26 +1,7 @@
-from torch import tensor
+from torch import Tensor
 from torch.utils.data import Dataset
-from torch.nn.utils.rnn import pad_sequence
 
-from typing import List, Dict, Tuple, Callable
-
-def get_collator(pad_token: int = 0) -> Callable:
-    def collate_fn(data: List[Tuple[tensor, tensor, int]]):
-        inputs = []
-        targets = []
-        lengths = []
-
-        for inp, tar, leng in data:
-            inputs.append(inp)
-            targets.append(tar)
-            lengths.append(leng)
-
-        inputs = pad_sequence(inputs, batch_first = True, padding_value=pad_token)
-        targets = pad_sequence(targets, batch_first = True, padding_value=pad_token)
-
-        return inputs, targets, lengths
-
-    return collate_fn
+from typing import List, Dict
 
 class SentsDataset(Dataset):
     def __init__(self, sents: List[str], w2i: Dict[str, int]) -> None:
@@ -47,4 +28,4 @@ class SentsDataset(Dataset):
         inp = self.inputs[index] 
         target = self.targets[index]
         length = self.lengths[index]
-        return tensor(inp), tensor(target), length
+        return Tensor(inp), Tensor(target), length
