@@ -8,9 +8,19 @@ from typing import List, Union
 class SequenceModel(pl.LightningModule):
     def __init__(
             self, 
-            model: nn.Module,):
+            model: nn.Module,
+            learning_rate: float = 0.1,
+            momentum: float = 0.9,
+            optimizer: str = "sgd"):
         super().__init__()
         self.model = model
+        self.lr = learning_rate
+        self.momentum = momentum
+
+        if optimizer not in ["sgd", "adam"]:
+            raise ValueError("Please provide either 'sgd' or 'adam' as optimizer")
+
+        self.optimizer = optimizer
 
     def forward(
             self, 
@@ -38,7 +48,18 @@ class SequenceModel(pl.LightningModule):
         self.compute_epoch_level_metrics(outputs, "Test")
 
     def configure_optimizers(self):
-        optimizer = torch.optim.SGD(self.parameters(), lr=0.1, weight_decay=1e-6, momentum=0.9)
+        if self.optimizer == "sgd":
+            optimizer = torch.optim.SGD(
+                self.parameters(), 
+                lr=self.lr, 
+                weight_decay=1e-6, 
+                momentum=self.momentum,
+                nesterov=True)
+        elif self.optimizer == "adam":
+            optimizer = torch.optim.Adam(
+                self.parameters(), 
+                lr=self.lr, 
+                weight_decay=1e-6)
         return optimizer
 
     def compute_forward_and_loss(self, batch):
