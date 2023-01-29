@@ -13,7 +13,9 @@ class SequenceModelWrapper(pl.LightningModule):
             learning_rate: float = 0.1,
             momentum: float = 0.9,
             optimizer: str = "sgd",
-            ntasgd: int = -1):
+            ntasgd: int = -1,
+            tbptt: bool = False,
+            tbptt_config: Dict[str, int] = {}):
         super().__init__()
 
         self.model = model
@@ -27,6 +29,12 @@ class SequenceModelWrapper(pl.LightningModule):
         self.ntasgd = ntasgd
         self.ntasgd_trigger = False
         self.logs = []
+        
+        self.tbptt = tbptt
+        if tbptt:
+            # placeholder, computed according to Merity et al.
+            self.truncated_bptt_steps = 5
+            self.tbptt_config = tbptt_config
 
     def forward(
             self, 
@@ -35,13 +43,12 @@ class SequenceModelWrapper(pl.LightningModule):
             hidden: Union[List[torch.Tensor], None] = None):
         return self.model(inputs, lengths, hidden)
         
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch, batch_idx, *args):
+        if self.tbptt:
+            hiddens = args[0]
         return self._compute_forward_and_loss(batch)
 
     def training_epoch_end(self, outputs):
-        optimizer = self.optimizers()
-        opt = optimizer.optimizer
-        print(opt)
         _, _ = self._compute_epoch_level_metrics(outputs, "Train")
  
     def validation_step(self, batch, batch_idx):
@@ -69,25 +76,50 @@ class SequenceModelWrapper(pl.LightningModule):
 
     def configure_optimizers(self):
         if self.optimizer == "sgd":
-            optimizer = optim.SGD(
+            optimizer = torch.optim.SGD(
                 self.parameters(), 
                 lr=self.lr, 
                 weight_decay=1e-6, 
                 momentum=self.momentum,
                 nesterov=True)
         elif self.optimizer == "adam":
-            optimizer = optim.Adam(
+            optimizer = torch.optim.Adam(
                 self.parameters(), 
                 lr=self.lr, 
                 weight_decay=1e-6)
         return optimizer
 
+    def on_train_batch_start(self, batch: Any, batch_idx: int) -> Optional[int]:
+        if self.tbptt:
+            self.truncated_bptt_steps = self._get_tbptt_step()
+
+    def tbptt_split_batch(self, batch: Any, split_size: int) -> List[Any]:
+        splits = []
+        return [batch]
+    # def tbptt_split_batch(self, batch, split_size):
+    #     splits = []
+    #     for t in range(0, time_dims[0], split_size):
+    #         batch_split = []
+    #         for i, x in enumerate(batch):
+    #             if isinstance(x, torch.Tensor):
+    #                 split_x = x[:, t:t + split_size]
+    #             elif isinstance(x, collections.abc.Sequence):
+    #                 split_x = [None] * len(x)
+    #                 for batch_idx in range(len(x)):
+    #                   split_x[batch_idx] = x[batch_idx][t:t + split_size]
+    #             batch_split.append(split_x)
+    #         splits.append(batch_split)
+    #     return splits
+
     def _compute_forward_and_loss(self, batch):
         inputs, targets, lengths = batch
-        outputs, _ = self(inputs, lengths)
+        outputs, (hidden, _) = self(inputs, lengths)
         targets = targets.view(-1)
         loss = F.cross_entropy(outputs, targets, ignore_index=self.model.pad_value)
-        return {"loss": loss}
+        return_dict = {"loss": loss}
+        if self.tbptt:
+            return_dict["hiddens"] = hidden
+        return return_dict
 
     def _compute_epoch_level_metrics(self, outputs, stage_name: str) -> None:
         loss = torch.stack([x["loss"] for x in outputs]).mean()
@@ -102,3 +134,15 @@ class SequenceModelWrapper(pl.LightningModule):
             perplexity,
             self.current_epoch)
         return loss, perplexity
+
+    def _get_tbptt_step(self):
+        mu = self.tbptt_config["mu"]
+        std = self.tbptt_config["std"]
+        p = self.tbptt_config["p"]
+
+        mu = mu if np.random.random() < p else mu/2
+        tbptt_step = int(np.random.normal(mu, std)) 
+        tbptt_step = max(5, tbptt_step)
+        tbptt_step = min(tbptt_step, 82-10)
+
+        return tbptt_step
