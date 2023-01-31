@@ -1,7 +1,18 @@
 \section{Data Description \& Analysis}
 % approx. 200-500 words
-The data used for training and evaluation your model.
+% The data used for training and evaluation your model.
+% \begin{itemize}
+%     \item \textit{Dataset origin and composition}
+%     \item \textit{Statistics (vocab len, number of examples, label distribution if any)}
+% \end{itemize}
+The dataset used to train and evaluate the model is word-level Penn Treebank, which is a variation of the original Penn Treebank dataset built to be best suited to language modelling settings. 
+
+Specifically, the original Penn Treebank has undergone a pre-processing pipeline so that it features:
+
 \begin{itemize}
-    \item \textit{Dataset origin and composition}
-    \item \textit{Statistics (vocab len, number of examples, label distribution if any)}
+    \item consistent lowercase;
+    \item tokenization;
+    \item no punctuation;
+    \item proper nouns and other rare words have been encompassed by a \texttt{<unk>} token;
+    \item digits have been replaced with a \texttt{N} token;
 \end{itemize}

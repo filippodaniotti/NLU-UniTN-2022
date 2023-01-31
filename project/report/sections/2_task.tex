@@ -1,4 +1,5 @@
 \section{Task Formalisation}
+% approx. 200 words
 Language modelling is the task of developing a model which is able to predict which word comes next in a sequence. 
 
 A \emph{language model} is a probablity distribution over sequences of words. Suppose we have a sequence of \(n\) words modeled as a joint probability: \(P(w^{(n)}) = P(w_1, \ldots, w_n)\); we can compute this probablity using the \emph{chain rule}, which comes from the Bayes rule: \(P(A, B) = P(A|B)P(B)\). Ultimately, a language model computes the probability of a sequence as follows:
