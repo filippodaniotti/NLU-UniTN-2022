@@ -2,7 +2,11 @@
 
 \usepackage{INTERSPEECH2021}
 
-\title{Final NLU project template}
+% args: big, bigg, Big, Bigg
+\newcommand{\parenth}[2][]{#1(#2#1)}
+\renewcommand{\bold}[1]{\textbf{\structure{#1}}}
+
+\title{Language Modeling with Recurrent Neural Networks}
 \name{Filippo Daniotti (232087)}
 
 \address{
@@ -13,19 +17,13 @@
 
 \maketitle
 
-Dear students, \\
-here you can find a complete description of the sections that are mandatory for your project and you need to address them during the development, as well as your 4-page (+1 for References) project report.
+% Dear students, \\
+% here you can find a complete description of the sections that are mandatory for your project and you need to address them during the development, as well as your 4-page (+1 for References) project report.
 
 
-\section{Introduction (approx. 100 words)}
-\begin{itemize}
-    \item \textit{brief  summary of what you have done}
-\end{itemize}
-\section{Task Formalisation (approx. 200 words)}
-\begin{itemize}
-    \item \textit{formalisation of your task}
-\end{itemize}
-\section{Data Description & Analysis (approx. 200-500 words)}
+\input{sections/1_introduction.tex}
+\input{sections/2_task_formalisation.tex}
+\section{Data Description \& Analysis (approx. 200-500 words)}
 The data used for training and evaluation your model.
 \begin{itemize}
     \item \textit{Dataset origin and composition}
@@ -50,9 +48,9 @@ The data used for training and evaluation your model.
 \section{Conclusion}
 
 
-\bibliographystyle{IEEEtran}
+% \bibliographystyle{IEEEtran}
 
-\bibliography{mybib}
+% \bibliography{bibliography}
 
 % \begin{thebibliography}{9}
 % \bibitem[1]{Davis80-COP}
