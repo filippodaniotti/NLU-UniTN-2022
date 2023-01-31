@@ -6,7 +6,9 @@
 \newcommand{\parenth}[2][]{#1(#2#1)}
 \renewcommand{\bold}[1]{\textbf{\structure{#1}}}
 
-\title{Language Modeling with Recurrent Neural Networks}
+\title{Neural Language Modelling\
+% \\textit{Adopting and improving LSTM Recurrent Neural Networks as Language models}
+}
 \name{Filippo Daniotti (232087)}
 
 \address{
@@ -21,31 +23,12 @@
 % here you can find a complete description of the sections that are mandatory for your project and you need to address them during the development, as well as your 4-page (+1 for References) project report.
 
 
-\input{sections/1_introduction.tex}
-\input{sections/2_task_formalisation.tex}
-\section{Data Description \& Analysis (approx. 200-500 words)}
-The data used for training and evaluation your model.
-\begin{itemize}
-    \item \textit{Dataset origin and composition}
-    \item \textit{Statistics (vocab len, number of examples, label distribution if any)}
-\end{itemize}
-\section{Model (approx. 200-500 words)}
-\begin{itemize}
-    \item \textit{your network/ algorithm (do not spend too much text in explaining already existing models, focus on your solution),}
-    \item \textit{the pipeline if used any, including  tokenizer, featurizer, extractor, etc.}
-    \item \textit{Your baseline and the experiments you have tried}
-\end{itemize}
- 
-
-\section{Evaluation (approx. 400-800 words)}
-
-\begin{itemize}
-    \item \textit{The metrics you used}
-    \item \textit{Results on evaluation that you performed}
-    \item \textit{Comparison and differences between you model and the baseline}
-    \item \textit{Correct interpretation of errors and analysis}
-\end{itemize}
-\section{Conclusion}
+\input{sections/1_intro.tex}
+\input{sections/2_task.tex}
+\input{sections/03_data.tex}
+\input{sections/4_model.tex}
+\input{sections/5_eval.tex}
+\input{sections/6_conclusions.tex}
 
 
 % \bibliographystyle{IEEEtran}
