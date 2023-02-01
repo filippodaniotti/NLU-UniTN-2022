@@ -1,3 +1,5 @@
 penn_treebank/
 lightning_logs/
 *.zip
+runs/
+results/
