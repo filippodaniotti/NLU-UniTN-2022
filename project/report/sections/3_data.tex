@@ -1,10 +1,7 @@
 \section{Data Description \& Analysis}
+\label{sec:3_data}
 % approx. 200-500 words
-% The data used for training and evaluation your model.
-% \begin{itemize}
-%     \item \textit{Dataset origin and composition}
-%     \item \textit{Statistics (vocab len, number of examples, label distribution if any)}
-% \end{itemize}
+\paragraph*{Description}
 The dataset used to train and evaluate the model is word-level Penn Treebank, which is a variation of the original Penn Treebank dataset built to be best suited to language modelling settings. 
 
 Specifically, the original Penn Treebank has undergone a pre-processing pipeline so that it features:
@@ -15,4 +12,27 @@ Specifically, the original Penn Treebank has undergone a pre-processing pipeline
     \item no punctuation;
     \item proper nouns and other rare words have been encompassed by a \texttt{<unk>} token;
     \item digits have been replaced with a \texttt{N} token;
+    \item no OOV words in \emph{validation} and \emph{test} sets with respect to the \emph{training} set.
 \end{itemize}
+
+\input{./assets/tables/statistics.tex}
+
+\paragraph*{Statistics analysis}
+In Table \ref{tab:statistics} I am presenting a summary of the relevant statistics of the dataset.
+
+The PTB dataset appears to be balanced enough, as sents and words are evenly splitted and the mean and standard deviance \(\sigma\) of the words-per-sentence distribution are very similar, being around \(20\) and \(10\).
+
+Moreover, since there are no OOV words, we can rely on the train split to construct the vocabulary. Its length is given by the \(9999\) words, to which I added two more tokens:
+\begin{itemize}
+    \item \texttt{<pad>} is a pad token to pad shorter sequences to the length of the longest sequence in a given batch;
+    \item \texttt{<eos>} is a sentence terminator token.
+\end{itemize}
+
+The analysis of the most frequent words in the train split reveals that the most frequent words are extremely common function words, like articles (\textit{the}, \(5.7\)\%), or prepositions (\textit{of}, \(2.7\)\%), which is unsurprising. We are not surprised to observe that the two wrappers \texttt{<unk>} and \texttt{N} show high counts, being \(5.1\)\% and \(3.7\)\% respectively, ranking second and third most frequent words. Ultimately, the first 10 most frequent words make up almost 30\% of the total word count.
+
+\begin{figure}[!t]
+    \centering
+    \includegraphics[keepaspectratio,width=.5\textwidth]{assets/images/train_freq.png}
+    \caption{Frequency distribution of the 10 most frequent words (Train)} 
+    \label{fig:train_freq}
+\end{figure}
