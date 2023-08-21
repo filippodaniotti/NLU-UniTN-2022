@@ -6,6 +6,7 @@ import pytorch_lightning as pl
 
 from data.data_module import PennTreebank 
 from models.lstm import BaselineLSTM
+from models.merity import MerityLSTM
 from models.wrapper import SequenceModelWrapper
 
 from typing import Any
@@ -17,7 +18,25 @@ def get_model(config: dict[str, Any], vocab_size: int) -> nn.Module:
             embedding_dim = config["model"]["embedding_dim"],
             hidden_dim = config["model"]["hidden_dim"],
             num_layers = config["model"]["num_layers"],
-            p_dropout = config["model"]["p_dropout"]
+            p_dropout = config["model"]["p_dropout"],
+            pad_value = config["dataset"]["pad_value"]
+        )
+    elif config["experiment"]["model"] == "merity":
+        return MerityLSTM(
+            num_classes = vocab_size,
+            embedding_dim = config["model"]["embedding_dim"],
+            hidden_dim = config["model"]["hidden_dim"],
+            num_layers = config["model"]["num_layers"],
+            locked_dropout= bool(config["model"]["locked_dropout"]),
+            p_lockdrop = config["model"]["p_lockdrop"],
+            embedding_dropout = bool(config["model"]["embedding_dropout"]),
+            p_embdrop = config["model"]["p_embdrop"],
+            weight_dropout = bool(config["model"]["weight_dropout"]),
+            p_lstmdrop = config["model"]["p_lstmdrop"],
+            p_hiddrop = config["model"]["p_hiddrop"],
+            init_weights = bool(config["model"]["init_weights"]),
+            tie_weights = bool(config["model"]["tie_weights"]),
+            pad_value = config["dataset"]["pad_value"]
         )
     else:
         raise ValueError("Provided model not available.")

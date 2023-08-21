@@ -2,42 +2,34 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
-class WeightDropLSTM(nn.LSTM):
-    """
-    Wrapper around :class:`torch.nn.LSTM` that adds ``weight_dropout`` named argument.
+def _weight_drop(module, weights, dropout):
+    for name_w in weights:
+        w = getattr(module, name_w)
+        del module._parameters[name_w]
+        module.register_parameter(name_w + '_raw', nn.Parameter(w))
 
-    Args:
-        weight_dropout (float): The probability a weight will be dropped.
-    """
+    original_module_forward = module.forward
 
-    def __init__(self, *args, weight_dropout=0.0, **kwargs):
-        super().__init__(*args, **kwargs)
-        weights = ['weight_hh_l' + str(i) for i in range(self.num_layers)]
-        self._weight_drop(weights, weight_dropout)
-
-
-    def _weight_drop(self, weights, dropout):
-        """
-        Helper for `WeightDrop`.
-        """
-
+    def forward(*args, **kwargs):
         for name_w in weights:
-            w = getattr(self, name_w)
-            del self._parameters[name_w]
-            self.register_parameter(name_w + '_raw', nn.Parameter(w))
+            raw_w = getattr(module, name_w + '_raw')
+            # FIX: convert weights back to nn.Paramter before assignment
+            w = nn.Parameter(nn.functional.dropout(
+                raw_w, p=dropout, training=module.training))
+            setattr(module, name_w, w)
 
-        original_self_forward = self.forward
+        return original_module_forward(*args, **kwargs)
 
-        def forward(*args, **kwargs):
-            for name_w in weights:
-                raw_w = getattr(self, name_w + '_raw')
-                w = nn.functional.dropout(raw_w, p=dropout, training=self.training)
-                w = nn.Parameter(w)
-                setattr(self, name_w, w)
+    setattr(module, 'forward', forward)
 
-            return original_self_forward(*args, **kwargs)
+class WeightDropLSTM(nn.Module):
+    def __init__(self, module, weights, dropout=0.0):
+        super().__init__()
+        _weight_drop(module, weights, dropout)
+        self.forward = module.forward
 
-        setattr(self, 'forward', forward)
+
+
 
 class LockedDropout(nn.Module):
     """

@@ -16,7 +16,7 @@ class MerityLSTM(BaselineLSTM):
             p_lockdrop: float = 0.4,
             embedding_dropout = False,
             p_embdrop: float = 0.1,
-            weight_drop: bool = False,
+            weight_dropout: bool = False,
             p_lstmdrop: float = 0.3,
             p_hiddrop: float = 0.5,
             init_weights: bool = False,
@@ -31,7 +31,7 @@ class MerityLSTM(BaselineLSTM):
         if embedding_dropout:
             self.embedding = EmbeddingDropout(num_classes, embedding_dim, pad_value, dropout=p_embdrop)
 
-        if weight_drop:
+        if weight_dropout:
             self.lstm = nn.LSTM(
                 embedding_dim,
                 hidden_dim,
@@ -55,7 +55,6 @@ class MerityLSTM(BaselineLSTM):
             self.embedding.weight = self.fc.weight
 
         if init_weights:
-            # self._init_weights()
             self.apply(self._init_weights)
 
     def forward(
