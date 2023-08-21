@@ -49,7 +49,12 @@ class SequenceModelWrapper(pl.LightningModule):
         inputs, targets, lengths = batch
         loss, ppl = self._forward_loss_ppl(inputs, targets, lengths)
         metrics = self._print_metrics(loss.item(), ppl.item(), "Valid")
+        self.logs.append(ppl)
         return metrics
+    
+    def on_validation_epoch_end(self) -> None:
+        if (self.ntasgd > -1  and not self.ntasgd_trigger and (self.current_epoch >= self.ntasgd and self.logs[-1] > min(self.logs[:-self.ntasgd]))):
+            self._switch_to_asgd()
 
 
     def test_step(self, batch, batch_idx):
