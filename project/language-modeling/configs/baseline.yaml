@@ -1,0 +1,21 @@
+dataset:
+  ds_url: https://data.deepai.org/ptbdataset.zip
+  ds_path: penn_treebank
+  pad_value: 0
+
+results: 
+  logs_path: runs
+
+experiment:
+  experiment_name: baseline
+  epochs: 50
+  batch_size: 128
+  model: baseline
+  optimizer: adam
+  learning_rate: 1e-3
+
+model:
+  embedding_dim: 300
+  hidden_dim: 300
+  num_layers: 1
+  p_dropout: .5

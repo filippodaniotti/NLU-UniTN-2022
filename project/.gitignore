@@ -3,3 +3,4 @@ lightning_logs/
 *.zip
 runs/
 results/
+tmp/

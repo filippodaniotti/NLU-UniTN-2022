@@ -1,7 +1,5 @@
 from collections import Counter
 
-from typing import List, Dict, Tuple
-
 class Lang():
     def __init__(
             self, 
@@ -16,10 +14,10 @@ class Lang():
         
     def map_tokens(
             self, 
-            words: List[str], 
+            words: list[str], 
             pad_value: int, 
             eos_token: int, 
-            cutoff: int = None) -> Tuple[Dict[str, int], Dict[int, str]]:
+            cutoff: int = None) -> tuple[dict[str, int], dict[int, str]]:
         """
         No need to tackle oov, there are none of them
         """
@@ -43,7 +41,7 @@ class Lang():
 
         return w2id, id2w
 
-    def get_words_from_sents(self, sents: List[str]) -> List[str]:
+    def get_words_from_sents(self, sents: list[str]) -> list[str]:
         words = []
         for sent in sents:
             words.extend(sent.split())
