@@ -67,19 +67,14 @@ class MerityLSTM(BaselineLSTM):
         embedding = self.embedding(inputs)
         # in locked dropout
         embedding = self.in_locked_dropout(embedding) if self.locked_dropout else embedding
-        # try:
         packed_inputs = nn.utils.rnn.pack_padded_sequence(embedding, lengths, batch_first=True, enforce_sorted=False)
-        # if hiddens is not None:
-        #     ht = hiddens[0][:, :batch_size, :].contiguous()
-        #     ct = hiddens[1][:, :batch_size, :].contiguous()
-        #     hidden = (ht, ct)
-        packed_outputs, hidden = self.lstm(packed_inputs, hiddens)
+        packed_outputs, hiddens = self.lstm(packed_inputs, hiddens)
         outputs, _ = nn.utils.rnn.pad_packed_sequence(packed_outputs, batch_first=True)
         # out locked dropout
         outputs = self.out_locked_dropout(outputs) if self.locked_dropout else outputs
         prediction = self.fc(outputs)
         prediction = prediction.reshape(-1, prediction.shape[2])
-        return prediction, hidden
+        return prediction, hiddens
 
     def _init_weights(self, mat):
         for m in mat.modules():

@@ -1,10 +1,16 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from typing import Union, Callable, Tuple, List
+from collections import OrderedDict, defaultdict
 
-def get_collator(pad_token: int = 0, p_reverse: Union[float, None] = None) -> Callable:
-    def collate_fn(data: List[Tuple[torch.tensor, torch.tensor, int]]):
+from torch import tensor, flip, split
+
+def get_collator(
+        pad_token: int = 0, 
+        tbptt: bool = False,
+        p_reverse: float | None = None) -> callable:
+        
+    def collate_fn(data: list[tuple[tensor, tensor, int]]):
         inputs = []
         targets = []
         lengths = []
@@ -24,8 +30,39 @@ def get_collator(pad_token: int = 0, p_reverse: Union[float, None] = None) -> Ca
             targets.append(tar)
             lengths.append(leng)
 
-        inputs = nn.utils.rnn.pad_sequence(inputs, batch_first = True, padding_value=pad_token)
-        targets = nn.utils.rnn.pad_sequence(targets, batch_first = True, padding_value=pad_token)
+
+        if tbptt:
+
+            tbptt_lengths = []
+            tbptt_inputs = defaultdict(list)
+            tbptt_targets = defaultdict(list)
+
+            sorted_idxs = np.argsort(lengths)[::-1]
+            for word_idx in sorted_idxs:
+                length, inp, tar = lengths[word_idx], inputs[word_idx], targets[word_idx]
+                tbptt_lengths.append(length)
+
+                split_inp = torch.split(inp, 20, dim=0)
+                split_tar = torch.split(tar, 20, dim=0)
+                
+                for split_idx, (i, t) in enumerate(zip(split_inp, split_tar)):
+                    tbptt_inputs[split_idx].append(i)
+                    tbptt_targets[split_idx].append(t)
+
+            lengths = tbptt_lengths
+            inputs = [
+                nn.utils.rnn.pad_sequence(inp, batch_first=True, padding_value=pad_token)
+                for inp in tbptt_inputs.values()
+            ]
+            targets = [
+                nn.utils.rnn.pad_sequence(tar, batch_first=True,
+                            padding_value=pad_token)
+                for tar in tbptt_targets.values()
+            ]
+
+        else:
+            inputs = nn.utils.rnn.pad_sequence(inputs, batch_first = True, padding_value=pad_token)
+            targets = nn.utils.rnn.pad_sequence(targets, batch_first = True, padding_value=pad_token)
 
         return inputs, targets, lengths
 

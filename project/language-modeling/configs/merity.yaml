@@ -11,6 +11,7 @@ experiment:
   epochs: 50
   batch_size: 128
   model: merity
+  tbptt: True
   optimizer: sgd
   learning_rate: 1e-1
 

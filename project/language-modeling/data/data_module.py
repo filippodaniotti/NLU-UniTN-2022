@@ -18,12 +18,14 @@ class PennTreebank(pl.LightningDataModule):
             data_dir: str,
             temp_zip_name = "ptb.zip",
             batch_size: int = 64,
+            tbptt: bool = False,
             p_reverse: float = None):
         super().__init__()
         self.download_url = download_url
         self.data_dir = data_dir
         self.temp_zip_name = temp_zip_name
         self.batch_size = batch_size
+        self.tbptt = tbptt
         self.p_reverse = p_reverse
 
         # placeholders
@@ -70,7 +72,8 @@ class PennTreebank(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=True,
             collate_fn=get_collator(
-                p_reverse=self.p_reverse),
+                p_reverse=self.p_reverse,
+                tbptt=self.tbptt),
             num_workers=4)
 
     def val_dataloader(self):

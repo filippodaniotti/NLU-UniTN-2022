@@ -40,6 +40,7 @@ class SequenceModelWrapper(pl.LightningModule):
 
     def training_step(self, batch: tuple[torch.tensor, torch.tensor], batch_idx: int):
         inputs, targets, lengths = batch
+
         loss, ppl = self._forward_loss_ppl(inputs, targets, lengths)
         metrics = self._print_metrics(loss.item(), ppl.item(), "Train")
         return loss
@@ -88,10 +89,27 @@ class SequenceModelWrapper(pl.LightningModule):
                 },
             }
 
-    def _forward_loss_ppl(self, inputs, targets, lengths, hiddens = None):
+    def _forward_loss_ppl(self, inputs, targets, lengths):
         outputs, hiddens = self(inputs, lengths)
         loss = self.cost_fn(outputs, targets.view(-1))
         return loss, torch.exp(loss)
+    
+    def _tbptt_forward_loss_ppl(self, inputs, targets, lengths):
+        hiddens = None
+        batch_loss = .0
+        opt = self.optimizers()
+        for split_idx, (inps, tars) in enumerate(zip(inputs, targets)):
+            # compute lengths
+            # detach hiddens
+            outputs, hiddens = self(inps, lengths, hiddens)
+            opt.zero_grad()
+            loss = self.cost_fn(outputs, tars.view(-1))
+            self.manual_backward(loss)
+            # clip gradient
+            opt.step()
+            batch_loss += loss.item()
+        batch_loss /= (split_idx + 1)
+        return batch_loss, torch.exp(batch_loss)
 
     def _print_metrics(self, loss: float, ppl: float, stage: str):
         metrics = {f"Loss/{stage}": loss, f"Perplexity/{stage}": ppl}

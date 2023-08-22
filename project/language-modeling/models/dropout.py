@@ -28,9 +28,6 @@ class WeightDropLSTM(nn.Module):
         _weight_drop(module, weights, dropout)
         self.forward = module.forward
 
-
-
-
 class LockedDropout(nn.Module):
     """
     https://github.com/salesforce/awd-lstm-lm/blob/master/locked_dropout.py
