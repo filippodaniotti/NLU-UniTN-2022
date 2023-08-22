@@ -15,7 +15,8 @@ class SequenceModelWrapper(pl.LightningModule):
             learning_rate: float = 0.1,
             momentum: float = 0.9,
             optimizer: str = "sgd",
-            ntasgd: int = -1,):
+            ntasgd: int = -1,
+            tbptt: bool = False,):
         super().__init__()
 
         self.model = model
@@ -31,17 +32,27 @@ class SequenceModelWrapper(pl.LightningModule):
         self.ntasgd_trigger = False
         self.logs = []
 
+        if tbptt:
+            self.tbptt = tbptt
+            self.automatic_optimization = False
+
     def forward(
             self,
             inputs: torch.Tensor,
             lengths: list[int],
-            hidden: list[torch.Tensor] | None = None):
-        return self.model(inputs, lengths, hidden)
+            hidden: list[torch.Tensor] | None = None,
+            split_idx: int | None = 0,):
+        if self.tbptt:
+            if split_idx is None:
+                raise ValueError("Please provide a split index when using TBPTT")
+            return self.model(inputs, lengths, hidden, split_idx)
+        else:
+            return self.model(inputs, lengths, hidden)
 
     def training_step(self, batch: tuple[torch.tensor, torch.tensor], batch_idx: int):
         inputs, targets, lengths = batch
-
-        loss, ppl = self._forward_loss_ppl(inputs, targets, lengths)
+        forward_step = self._forward_loss_ppl if not self.tbptt else self._tbptt_forward_loss_ppl
+        loss, ppl = forward_step(inputs, targets, lengths)
         metrics = self._print_metrics(loss.item(), ppl.item(), "Train")
         return loss
 
@@ -90,25 +101,30 @@ class SequenceModelWrapper(pl.LightningModule):
             }
 
     def _forward_loss_ppl(self, inputs, targets, lengths):
-        outputs, hiddens = self(inputs, lengths)
+        outputs, _ = self(inputs, lengths)
         loss = self.cost_fn(outputs, targets.view(-1))
         return loss, torch.exp(loss)
     
     def _tbptt_forward_loss_ppl(self, inputs, targets, lengths):
-        hiddens = None
+        hiddens = self.model._init_hidden(inputs[0].shape[0])
         batch_loss = .0
         opt = self.optimizers()
         for split_idx, (inps, tars) in enumerate(zip(inputs, targets)):
-            # compute lengths
-            # detach hiddens
-            outputs, hiddens = self(inps, lengths, hiddens)
+            # compute lengths depending on the current split
+            lengths = torch.where(inps != 0, 1, 0).cpu()
+            lengths = torch.sum(lengths, dim=1)
+            if split_idx > 0:
+                hiddens = self._detach_hidden(hiddens)
+            outputs, hiddens = self(inps, lengths, hiddens, split_idx)
             opt.zero_grad()
             loss = self.cost_fn(outputs, tars.view(-1))
             self.manual_backward(loss)
-            # clip gradient
+            # clip gradients
+            self.clip_gradients(opt, gradient_clip_val=0.5, gradient_clip_algorithm="norm")
             opt.step()
             batch_loss += loss.item()
         batch_loss /= (split_idx + 1)
+        batch_loss = torch.tensor(batch_loss, device=inputs[0].device)
         return batch_loss, torch.exp(batch_loss)
 
     def _print_metrics(self, loss: float, ppl: float, stage: str):

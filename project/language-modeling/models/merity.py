@@ -4,6 +4,8 @@ import torch.nn as nn
 from .lstm import BaselineLSTM
 from .dropout import LockedDropout, WeightDropLSTM, EmbeddingDropout
 
+from torch import tensor
+
 class MerityLSTM(BaselineLSTM):
     def __init__(
             self,
@@ -28,10 +30,10 @@ class MerityLSTM(BaselineLSTM):
             num_layers,
             pad_value,)
 
-        if embedding_dropout:
+        if embedding_dropout > .0:
             self.embedding = EmbeddingDropout(num_classes, embedding_dim, pad_value, dropout=p_embdrop)
 
-        if weight_dropout:
+        if weight_dropout > .0:
             self.lstm = nn.LSTM(
                 embedding_dim,
                 hidden_dim,
@@ -59,15 +61,24 @@ class MerityLSTM(BaselineLSTM):
 
     def forward(
             self,
-            inputs: torch.Tensor,
+            inputs: tensor,
             lengths: list[int],
-            hiddens: tuple[torch.Tensor, torch.Tensor] | None = None):
+            hiddens: tuple[tensor, tensor] | None = None,
+            split_idx: int | None = 0,
+        ):
         batch_size = inputs.shape[0]
         # embedding dropout
         embedding = self.embedding(inputs)
         # in locked dropout
         embedding = self.in_locked_dropout(embedding) if self.locked_dropout else embedding
         packed_inputs = nn.utils.rnn.pack_padded_sequence(embedding, lengths, batch_first=True, enforce_sorted=False)
+
+        if split_idx > 0:
+            h_n, c_n = torch.stack(hiddens[0], dim=0), torch.stack(hiddens[1], dim=0)
+            h_n = h_n[:, :inputs.shape[0], :]
+            c_n = c_n[:, :inputs.shape[0], :]
+            hiddens = [h_n, c_n]
+
         packed_outputs, hiddens = self.lstm(packed_inputs, hiddens)
         outputs, _ = nn.utils.rnn.pad_packed_sequence(packed_outputs, batch_first=True)
         # out locked dropout

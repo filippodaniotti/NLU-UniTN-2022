@@ -48,9 +48,16 @@ def train(config: dict[str, Any]):
     ptb = PennTreebank(
         download_url = config["dataset"]["ds_url"], 
         data_dir = config["dataset"]["ds_path"], 
-        batch_size = config["experiment"]["batch_size"]
+        batch_size = config["experiment"]["batch_size"],
+        tbptt= bool(config["experiment"]["tbptt"]),
     )
     ptb.prepare_data()
+    # ptb.setup(stage="fit")
+    # for i, t, l in ptb.train_dataloader():
+    #     print(l)
+    #     # print(l)
+    #     # print(i[0].shape)
+    #     break
     logger = pl.loggers.TensorBoardLogger(
         config["results"]["logs_path"], 
         config["experiment"]["experiment_name"]
@@ -60,7 +67,8 @@ def train(config: dict[str, Any]):
         model = get_model(config, ptb.vocab_size),
         cost_function = get_cost_function(config),
         optimizer = config["experiment"]["optimizer"],
-        learning_rate = float(config["experiment"]["learning_rate"])
+        learning_rate = float(config["experiment"]["learning_rate"]),
+        tbptt = bool(config["experiment"]["tbptt"]),
     )
     trainer.fit(model=model, datamodule=ptb)
 
