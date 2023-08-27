@@ -7,6 +7,9 @@ import torch.optim as optim
 import torch.nn.functional as F
 import pytorch_lightning as pl
 
+from models.lstm import BaselineLSTM
+from models.merity import MerityLSTM
+
 class SequenceModelWrapper(pl.LightningModule):
     def __init__(
             self,
@@ -32,9 +35,11 @@ class SequenceModelWrapper(pl.LightningModule):
         self.ntasgd_trigger = False
         self.logs = []
 
+        self.tbptt = tbptt
         if tbptt:
-            self.tbptt = tbptt
             self.automatic_optimization = False
+
+        self.results = []
 
     def forward(
             self,
@@ -50,6 +55,7 @@ class SequenceModelWrapper(pl.LightningModule):
             return self.model(inputs, lengths, hidden)
 
     def training_step(self, batch: tuple[torch.tensor, torch.tensor], batch_idx: int):
+        # print(self.trainer.callback_metrics)
         inputs, targets, lengths = batch
         forward_step = self._forward_loss_ppl if not self.tbptt else self._tbptt_forward_loss_ppl
         loss, ppl = forward_step(inputs, targets, lengths)
@@ -109,6 +115,7 @@ class SequenceModelWrapper(pl.LightningModule):
         hiddens = self.model._init_hidden(inputs[0].shape[0])
         batch_loss = .0
         opt = self.optimizers()
+        sch = self.lr_schedulers()
         for split_idx, (inps, tars) in enumerate(zip(inputs, targets)):
             # compute lengths depending on the current split
             lengths = torch.where(inps != 0, 1, 0).cpu()
@@ -120,8 +127,12 @@ class SequenceModelWrapper(pl.LightningModule):
             loss = self.cost_fn(outputs, tars.view(-1))
             self.manual_backward(loss)
             # clip gradients
-            self.clip_gradients(opt, gradient_clip_val=0.5, gradient_clip_algorithm="norm")
+            self.clip_gradients(opt, gradient_clip_val=0.25, gradient_clip_algorithm="norm")
             opt.step()
+            try: 
+                sch.step(self.trainer.callback_metrics["Loss/Valid"])
+            except KeyError:
+                pass
             batch_loss += loss.item()
         batch_loss /= (split_idx + 1)
         batch_loss = torch.tensor(batch_loss, device=inputs[0].device)
@@ -145,20 +156,32 @@ class SequenceModelWrapper(pl.LightningModule):
             weight_decay=1e-6)
         self.lr_schedulers().optimizer = self.optimizers()._optimizer
 
-    def _get_tbptt_step(self):
-        mu = self.tbptt_config["mu"]
-        std = self.tbptt_config["std"]
-        p = self.tbptt_config["p"]
-
-        mu = mu if np.random.random() < p else mu/2
-        tbptt_step = int(np.random.normal(mu, std))
-        tbptt_step = max(5, tbptt_step)
-        tbptt_step = min(tbptt_step, 82-10)
-
-        return tbptt_step
-
     def _detach_hidden(self, hiddens):
         hiddens, cells = hiddens
         hiddens = [hidden.detach() for hidden in hiddens]
         cells = [cell.detach() for cell in cells]
         return hiddens, cells
+    
+    @classmethod
+    def load_model(
+            cls,
+            checkpoint_path: str,
+            map_location: str,
+            model: nn.Module,
+            cost_function: nn.Module,
+        ) -> "SequenceModelWrapper":
+
+        state_dict = torch.load(checkpoint_path, map_location=map_location)["state_dict"]
+
+        if isinstance(model, MerityLSTM):
+            print("")
+            to_rmv = []
+            for k in state_dict.keys():
+                if k.startswith("model.old_lstm.weight_hh") and (not k.endswith('_raw')):
+                    to_rmv.append(k)
+            for layer in to_rmv:
+                del state_dict[layer]
+
+        wrapper = cls(model, cost_function)
+        wrapper.load_state_dict(state_dict)
+        return wrapper

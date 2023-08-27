@@ -1,6 +1,8 @@
+from os.path import join
 import yaml
 from argparse import ArgumentParser
 
+import torch
 import torch.nn as nn
 import pytorch_lightning as pl
 
@@ -10,6 +12,9 @@ from models.merity import MerityLSTM
 from models.wrapper import SequenceModelWrapper
 
 from typing import Any
+
+def get_device() -> torch.device:
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def get_model(config: dict[str, Any], vocab_size: int) -> nn.Module:
     if config["experiment"]["model"] == "baseline":
@@ -40,6 +45,7 @@ def get_model(config: dict[str, Any], vocab_size: int) -> nn.Module:
         )
     else:
         raise ValueError("Provided model not available.")
+    
 
 def get_cost_function(config: dict[str, Any]) -> nn.Module:
     return nn.CrossEntropyLoss(ignore_index=config["dataset"]["pad_value"])
@@ -72,11 +78,27 @@ def train(config: dict[str, Any]):
     )
     trainer.fit(model=model, datamodule=ptb)
 
+def evaluate(config: dict[str, Any]):
+    ptb = PennTreebank(
+        download_url = config["dataset"]["ds_url"], 
+        data_dir = config["dataset"]["ds_path"], 
+        batch_size = config["experiment"]["batch_size"],
+        tbptt= bool(config["experiment"]["tbptt"]),
+    )
+    ptb.prepare_data()
+    trainer = pl.Trainer(logger=False)
+    model = SequenceModelWrapper.load_model(
+        checkpoint_path = join(*config["experiment"]["checkpoint_path"]),
+        map_location = get_device(),
+        model = get_model(config, ptb.vocab_size),
+        cost_function = get_cost_function(config),
+    )
+    print(type(model))
+    trainer.test(model=model, datamodule=ptb)
+
+
 if __name__ == "__main__":
     parser = ArgumentParser(description="Base interface")
-    parser.add_argument(
-        "-t", "--train", action="store_true", help="Train model flag"
-    )
     parser.add_argument(
         "-c", "--config", type=str, dest="config_path", help="Path of configuration file"
     )
@@ -84,5 +106,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     with open(args.config_path) as config_file:
         config = yaml.safe_load(config_file)
-    if args.train:
+    if config["experiment"]["mode"] == "train":
         train(config)
+    elif config["experiment"]["mode"] == "evaluate":
+        evaluate(config)
