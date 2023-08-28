@@ -36,8 +36,10 @@ class Lang():
 
         if eos_token is None:
             w2id['<eos>'] = curr_len
+            id2w[curr_len] = '<eos>'
         else:
             w2id['<eos>'] = eos_token
+            w2id[eos_token] = "<eos>"
 
         return w2id, id2w
 

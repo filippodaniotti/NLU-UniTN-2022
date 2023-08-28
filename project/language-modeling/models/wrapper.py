@@ -10,6 +10,7 @@ import pytorch_lightning as pl
 
 from models.lstm import BaselineLSTM
 from models.merity import MerityLSTM
+from data.data_module import Lang
 
 from typing import Any
 
@@ -95,6 +96,44 @@ class SequenceModelWrapper(pl.LightningModule):
     
     def on_test_end(self) -> None:
         self._dump_results(self.results, "results.pkl")
+
+    @torch.no_grad()
+    def generate(
+            self, 
+            prompt: str, 
+            lang: Lang, 
+            max_len: int = 30, 
+            mode: str = "argmax",
+            allow_unk: bool = False,
+            temperature: float = 1.0) -> str:
+        
+        if mode not in ["multinomial", "argmax"]:
+            raise ValueError("Please provide either 'multinomial' or 'argmax' as mode")        
+            
+        get_pred = lambda o, m: \
+                        torch.argmax(o, dim=1)[-1] if m == "argmax"  \
+                        else torch.multinomial(o, num_samples=1)
+        
+        prompt = prompt.lower().split(" ")
+        text = [lang.words2ids[w] for w in prompt]
+        hidden = self.model._init_hidden(1)
+        pred = None
+
+        while pred != lang.words2ids["<eos>"] and len(text) < max_len:
+            inp = torch.tensor(text).unsqueeze(0)
+            length = np.asarray([len(text)], dtype=np.int64)
+            output, hidden = self(inp, length, hidden)
+            output = output[-1, :].unsqueeze(0)
+            softmax = torch.softmax(output / temperature, dim=1)
+            pred = get_pred(softmax, mode).item()
+
+            if not allow_unk:
+                while pred == lang.words2ids["<unk>"]:
+                    pred = get_pred(softmax, "multinomial").item()
+            
+            text.append(pred)
+
+        return " ".join([lang.ids2words[w] for w in text])
 
 
     def configure_optimizers(self):

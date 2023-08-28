@@ -1,5 +1,6 @@
-from os.path import join
 import yaml
+import pickle
+from os.path import join
 from argparse import ArgumentParser
 
 import torch
@@ -93,17 +94,65 @@ def evaluate(config: dict[str, Any]):
     )
     trainer.test(model=model, datamodule=ptb)
 
+def inference(
+        config: dict[str, Any],
+        prompt: str,
+        mode: str,
+    ):
+    with open("lang.pkl", "rb") as f:
+        lang = pickle.load(f)
+    model = SequenceModelWrapper.load_model(
+        checkpoint_path = join(*config["experiment"]["checkpoint_path"]),
+        map_location = get_device(),
+        model = get_model(config, len(lang.words2ids)),
+        cost_function = get_cost_function(config),
+    )
+
+    temperatures = [0.5, 0.7, 0.75, 0.8, 1.0]
+    for temp in temperatures:
+        generated = model.generate(prompt, lang, mode=mode, temperature=temp)
+        print(f"t:{temp} => {generated}")
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="Base interface")
     parser.add_argument(
-        "-c", "--config", type=str, dest="config_path", help="Path of configuration file"
+        "-c", 
+        "--config", 
+        type=str, 
+        dest="config_path", 
+        help="Path of configuration file"
+    )
+    parser.add_argument(
+        "-i", 
+        "--inference", 
+        action="store_true", 
+        dest="inference", 
+        help="Flag for inference mode"
+    )
+    parser.add_argument(
+        "-p",
+        "--prompt",
+        type=str,
+        dest="prompt",
+        default="the",
+        help="Prompt for inference mode",
+    )
+    parser.add_argument(
+        "-m",
+        "--mode",
+        type=str,
+        dest="mode",
+        default="argmax",
+        help="Mode for inference mode",
     )
 
     args = parser.parse_args()
     with open(args.config_path) as config_file:
         config = yaml.safe_load(config_file)
-    if config["experiment"]["mode"] == "train":
+    if args.inference:
+        inference(config, prompt=args.prompt, mode=args.mode)
+    elif config["experiment"]["mode"] == "train":
         train(config)
     elif config["experiment"]["mode"] == "evaluate":
         evaluate(config)
+    

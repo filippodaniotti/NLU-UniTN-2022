@@ -8,12 +8,20 @@ results:
 
 experiment:
   experiment_name: merity
+  mode: evaluate
+  checkpoint_path: 
+    - runs
+    - merity_wld_ntasgd_adam
+    - version_0
+    - checkpoints
+    - epoch=49-step=16450.ckpt
   epochs: 50
-  batch_size: 128
+  # batch_size: 128
+  batch_size: 1
   model: merity
   tbptt: True
-  optimizer: sgd
-  learning_rate: 1e-1
+  optimizer: adam
+  learning_rate: 1e-3
 
 model:
   embedding_dim: 400
