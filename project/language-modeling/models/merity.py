@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -62,7 +63,7 @@ class MerityLSTM(BaselineLSTM):
     def forward(
             self,
             inputs: tensor,
-            lengths: list[int],
+            lengths: np.ndarray[int],
             hiddens: tuple[tensor, tensor] | None = None,
             split_idx: int | None = 0,
         ):
@@ -73,7 +74,7 @@ class MerityLSTM(BaselineLSTM):
         embedding = self.in_locked_dropout(embedding) if self.locked_dropout else embedding
         packed_inputs = nn.utils.rnn.pack_padded_sequence(embedding, lengths, batch_first=True, enforce_sorted=False)
 
-        if split_idx > 0:
+        if split_idx is not None and split_idx > 0:
             h_n, c_n = torch.stack(hiddens[0], dim=0), torch.stack(hiddens[1], dim=0)
             h_n = h_n[:, :inputs.shape[0], :]
             c_n = c_n[:, :inputs.shape[0], :]

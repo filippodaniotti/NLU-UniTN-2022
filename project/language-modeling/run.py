@@ -5,6 +5,8 @@ from argparse import ArgumentParser
 import torch
 import torch.nn as nn
 import pytorch_lightning as pl
+import torch.multiprocessing
+torch.multiprocessing.set_sharing_strategy('file_system')
 
 from data.data_module import PennTreebank 
 from models.lstm import BaselineLSTM
@@ -57,13 +59,7 @@ def train(config: dict[str, Any]):
         batch_size = config["experiment"]["batch_size"],
         tbptt= bool(config["experiment"]["tbptt"]),
     )
-    ptb.prepare_data()
-    # ptb.setup(stage="fit")
-    # for i, t, l in ptb.train_dataloader():
-    #     print(l)
-    #     # print(l)
-    #     # print(i[0].shape)
-    #     break
+    ptb.prepare_data() 
     logger = pl.loggers.TensorBoardLogger(
         config["results"]["logs_path"], 
         config["experiment"]["experiment_name"]
@@ -75,6 +71,7 @@ def train(config: dict[str, Any]):
         optimizer = config["experiment"]["optimizer"],
         learning_rate = float(config["experiment"]["learning_rate"]),
         tbptt = bool(config["experiment"]["tbptt"]),
+        batch_size = config["experiment"]["batch_size"],
     )
     trainer.fit(model=model, datamodule=ptb)
 
@@ -92,8 +89,8 @@ def evaluate(config: dict[str, Any]):
         map_location = get_device(),
         model = get_model(config, ptb.vocab_size),
         cost_function = get_cost_function(config),
+        batch_size = config["experiment"]["batch_size"],
     )
-    print(type(model))
     trainer.test(model=model, datamodule=ptb)
 
 

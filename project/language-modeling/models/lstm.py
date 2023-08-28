@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -31,7 +32,7 @@ class BaselineLSTM(nn.Module):
     def forward(
             self,
             inputs: torch.Tensor,
-            lengths: list[int],
+            lengths: np.ndarray[int],
             hidden: list[torch.Tensor] | None = None):
         embedding = self.embedding(inputs)
         packed_inputs = nn.utils.rnn.pack_padded_sequence(embedding, lengths, batch_first=True, enforce_sorted=False)

@@ -64,6 +64,6 @@ def get_collator(
             inputs = nn.utils.rnn.pad_sequence(inputs, batch_first = True, padding_value=pad_token)
             targets = nn.utils.rnn.pad_sequence(targets, batch_first = True, padding_value=pad_token)
 
-        return inputs, targets, lengths
+        return inputs, targets, np.asarray(lengths)
 
     return collate_fn

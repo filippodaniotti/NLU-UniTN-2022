@@ -1,4 +1,5 @@
 import math
+import pickle
 import numpy as np
 
 import torch
@@ -10,6 +11,8 @@ import pytorch_lightning as pl
 from models.lstm import BaselineLSTM
 from models.merity import MerityLSTM
 
+from typing import Any
+
 class SequenceModelWrapper(pl.LightningModule):
     def __init__(
             self,
@@ -19,13 +22,15 @@ class SequenceModelWrapper(pl.LightningModule):
             momentum: float = 0.9,
             optimizer: str = "sgd",
             ntasgd: int = -1,
-            tbptt: bool = False,):
+            tbptt: bool = False,
+            batch_size: int = 128):
         super().__init__()
 
         self.model = model
         self.cost_fn = cost_function
         self.lr = learning_rate
         self.momentum = momentum
+        self.batch_size = batch_size
 
         if optimizer not in ["sgd", "adam"]:
             raise ValueError("Please provide either 'sgd' or 'adam' as optimizer")
@@ -57,17 +62,17 @@ class SequenceModelWrapper(pl.LightningModule):
     def training_step(self, batch: tuple[torch.tensor, torch.tensor], batch_idx: int):
         # print(self.trainer.callback_metrics)
         inputs, targets, lengths = batch
-        forward_step = self._forward_loss_ppl if not self.tbptt else self._tbptt_forward_loss_ppl
-        loss, ppl = forward_step(inputs, targets, lengths)
-        metrics = self._print_metrics(loss.item(), ppl.item(), "Train")
+        forward_step = self.forward_wrapper if not self.tbptt else self.tbptt_forward_wrapper
+        loss, _ = forward_step(inputs, targets, lengths)
+        metrics = self._print_metrics(loss.item(), "Train")
         return loss
 
 
     def validation_step(self, batch: tuple[torch.tensor, torch.tensor], batch_idx: int):
         inputs, targets, lengths = batch
-        loss, ppl = self._forward_loss_ppl(inputs, targets, lengths)
-        metrics = self._print_metrics(loss.item(), ppl.item(), "Valid")
-        self.logs.append(ppl)
+        loss, _ = self.forward_wrapper(inputs, targets, lengths)
+        metrics = self._print_metrics(loss.item(), "Valid")
+        self.logs.append(math.exp(loss.item()))
         return metrics
     
     def on_validation_epoch_end(self) -> None:
@@ -77,9 +82,19 @@ class SequenceModelWrapper(pl.LightningModule):
 
     def test_step(self, batch, batch_idx):
         inputs, targets, lengths = batch
-        loss, ppl = self._forward_loss_ppl(inputs, targets, lengths)
-        metrics = self._print_metrics(loss.item(), ppl.item(), "Test")
+        loss, outputs = self.forward_wrapper(inputs, targets, lengths)
+        metrics = self._print_metrics(loss.item(), "Test")
+        self.results.append({
+            "inputs": inputs.numpy().squeeze(),
+            "targets": targets.numpy().squeeze(),
+            "lengths": lengths,
+            "outputs": outputs.numpy(),
+            "loss": loss.numpy(),
+        })
         return metrics
+    
+    def on_test_end(self) -> None:
+        self._dump_results(self.results, "results.pkl")
 
 
     def configure_optimizers(self):
@@ -106,12 +121,12 @@ class SequenceModelWrapper(pl.LightningModule):
                 },
             }
 
-    def _forward_loss_ppl(self, inputs, targets, lengths):
+    def forward_wrapper(self, inputs, targets, lengths):
         outputs, _ = self(inputs, lengths)
         loss = self.cost_fn(outputs, targets.view(-1))
-        return loss, torch.exp(loss)
+        return loss, outputs
     
-    def _tbptt_forward_loss_ppl(self, inputs, targets, lengths):
+    def tbptt_forward_wrapper(self, inputs, targets, lengths):
         hiddens = self.model._init_hidden(inputs[0].shape[0])
         batch_loss = .0
         opt = self.optimizers()
@@ -136,13 +151,13 @@ class SequenceModelWrapper(pl.LightningModule):
             batch_loss += loss.item()
         batch_loss /= (split_idx + 1)
         batch_loss = torch.tensor(batch_loss, device=inputs[0].device)
-        return batch_loss, torch.exp(batch_loss)
+        return batch_loss
 
-    def _print_metrics(self, loss: float, ppl: float, stage: str):
-        metrics = {f"Loss/{stage}": loss, f"Perplexity/{stage}": ppl}
-        self.log_dict(metrics, prog_bar=True, on_epoch=True, on_step=False, batch_size=128)
+    def _print_metrics(self, loss: float, stage: str):
+        metrics = {f"Loss/{stage}": loss, f"Perplexity/{stage}": math.exp(loss)}
+        self.log_dict(metrics, prog_bar=True, on_epoch=True, on_step=False, batch_size=self.batch_size)
         return metrics
-
+    
     def _switch_to_asgd(self):
         self.print(f"Using NT-ASGD at epoch {self.current_epoch}")
         self.ntasgd_trigger = True
@@ -161,6 +176,11 @@ class SequenceModelWrapper(pl.LightningModule):
         hiddens = [hidden.detach() for hidden in hiddens]
         cells = [cell.detach() for cell in cells]
         return hiddens, cells
+
+    @classmethod
+    def _dump_results(cls, results: dict[str, Any], filename: str):
+        with open(filename, "wb") as f:
+            pickle.dump(results, f)
     
     @classmethod
     def load_model(
@@ -169,6 +189,7 @@ class SequenceModelWrapper(pl.LightningModule):
             map_location: str,
             model: nn.Module,
             cost_function: nn.Module,
+            batch_size: int = 1,
         ) -> "SequenceModelWrapper":
 
         state_dict = torch.load(checkpoint_path, map_location=map_location)["state_dict"]
@@ -182,6 +203,6 @@ class SequenceModelWrapper(pl.LightningModule):
             for layer in to_rmv:
                 del state_dict[layer]
 
-        wrapper = cls(model, cost_function)
+        wrapper = cls(model, cost_function, batch_size=batch_size)
         wrapper.load_state_dict(state_dict)
         return wrapper
