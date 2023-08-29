@@ -1,5 +1,6 @@
 import yaml
 import pickle
+import numpy as np
 from os.path import join
 from argparse import ArgumentParser
 
@@ -18,6 +19,11 @@ from typing import Any
 
 def get_device() -> torch.device:
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+def seed_everything(seed: int) -> None:
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    pl.seed_everything(seed)
 
 def get_model(config: dict[str, Any], vocab_size: int) -> nn.Module:
     if config["experiment"]["model"] == "baseline":
@@ -54,6 +60,7 @@ def get_cost_function(config: dict[str, Any]) -> nn.Module:
     return nn.CrossEntropyLoss(ignore_index=config["dataset"]["pad_value"])
 
 def train(config: dict[str, Any]):
+    seed_everything(config["experiment"]["seed"])
     ptb = PennTreebank(
         download_url = config["dataset"]["ds_url"], 
         data_dir = config["dataset"]["ds_path"], 
@@ -80,7 +87,7 @@ def evaluate(config: dict[str, Any]):
     ptb = PennTreebank(
         download_url = config["dataset"]["ds_url"], 
         data_dir = config["dataset"]["ds_path"], 
-        batch_size = config["experiment"]["batch_size"],
+        batch_size = 1,
         tbptt= bool(config["experiment"]["tbptt"]),
     )
     ptb.prepare_data()
@@ -90,9 +97,14 @@ def evaluate(config: dict[str, Any]):
         map_location = get_device(),
         model = get_model(config, ptb.vocab_size),
         cost_function = get_cost_function(config),
-        batch_size = config["experiment"]["batch_size"],
+        batch_size = 1,
     )
-    trainer.test(model=model, datamodule=ptb)
+    # trainer.test(model=model, datamodule=ptb)
+    results_path = join(
+        *(config["experiment"]["checkpoint_path"])[:-2], 
+        f'{config["experiment"]["experiment_name"]}.pkl')
+    print(results_path)
+    # SequenceModelWrapper.dump_results(model.results, results_path)
 
 def inference(
         config: dict[str, Any],
@@ -123,6 +135,20 @@ if __name__ == "__main__":
         help="Path of configuration file"
     )
     parser.add_argument(
+        "-t", 
+        "--t", 
+        action="store_true", 
+        dest="train", 
+        help="Flag for train mode"
+    )
+    parser.add_argument(
+        "-e", 
+        "--evaluate", 
+        action="store_true", 
+        dest="evaluate", 
+        help="Flag for evaluation mode"
+    )
+    parser.add_argument(
         "-i", 
         "--inference", 
         action="store_true", 
@@ -137,22 +163,24 @@ if __name__ == "__main__":
         default="the",
         help="Prompt for inference mode",
     )
-    parser.add_argument(
-        "-m",
-        "--mode",
-        type=str,
-        dest="mode",
-        default="argmax",
-        help="Mode for inference mode",
-    )
+    # parser.add_argument(
+    #     "-m",
+    #     "--mode",
+    #     type=str,
+    #     dest="mode",
+    #     default="argmax",
+    #     help="Mode for inference mode",
+    # )
 
     args = parser.parse_args()
     with open(args.config_path) as config_file:
         config = yaml.safe_load(config_file)
     if args.inference:
         inference(config, prompt=args.prompt, mode=args.mode)
-    elif config["experiment"]["mode"] == "train":
+    elif args.train:
         train(config)
-    elif config["experiment"]["mode"] == "evaluate":
+    elif args.evaluate:
         evaluate(config)
+    else:
+        raise ValueError("Please provide a supported mode flag ('-t', '-e', '-i')")
     

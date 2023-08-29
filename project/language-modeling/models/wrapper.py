@@ -29,6 +29,7 @@ class SequenceModelWrapper(pl.LightningModule):
 
         self.model = model
         self.cost_fn = cost_function
+
         self.lr = learning_rate
         self.momentum = momentum
         self.batch_size = batch_size
@@ -39,7 +40,8 @@ class SequenceModelWrapper(pl.LightningModule):
         self.optimizer = optimizer
         self.ntasgd = ntasgd
         self.ntasgd_trigger = False
-        self.logs = []
+        self.validation_step_loss = []
+        self.validation_epochs_loss = []
 
         self.tbptt = tbptt
         if tbptt:
@@ -61,25 +63,28 @@ class SequenceModelWrapper(pl.LightningModule):
             return self.model(inputs, lengths, hidden)
 
     def training_step(self, batch: tuple[torch.tensor, torch.tensor], batch_idx: int):
-        # print(self.trainer.callback_metrics)
         inputs, targets, lengths = batch
         forward_step = self.forward_wrapper if not self.tbptt else self.tbptt_forward_wrapper
         loss, _ = forward_step(inputs, targets, lengths)
-        metrics = self._print_metrics(loss.item(), "Train")
+        _ = self._print_metrics(loss.item(), "Train")
         return loss
 
 
     def validation_step(self, batch: tuple[torch.tensor, torch.tensor], batch_idx: int):
         inputs, targets, lengths = batch
         loss, _ = self.forward_wrapper(inputs, targets, lengths)
-        metrics = self._print_metrics(loss.item(), "Valid")
-        self.logs.append(math.exp(loss.item()))
-        return metrics
+        _ = self._print_metrics(loss.item(), "Valid")
+        self.validation_step_loss.append(math.exp(loss.item()))
+        return loss
     
     def on_validation_epoch_end(self) -> None:
-        if (self.ntasgd > -1  and not self.ntasgd_trigger and (self.current_epoch >= self.ntasgd and self.logs[-1] > min(self.logs[:-self.ntasgd]))):
-            self._switch_to_asgd()
-
+        if self.ntasgd > -1:
+            self.validation_epochs_loss.append(torch.stack(self.validation_step_loss).mean())
+            self.validation_step_loss.clear()
+            if (not self.ntasgd_trigger and 
+                    (self.current_epoch >= self.ntasgd and 
+                     self.validation_epochs_loss[-1] > min(self.validation_epochs_loss[:-self.ntasgd]))):
+                self._switch_to_asgd()
 
     def test_step(self, batch, batch_idx):
         inputs, targets, lengths = batch
@@ -93,9 +98,6 @@ class SequenceModelWrapper(pl.LightningModule):
             "loss": loss.numpy(),
         })
         return metrics
-    
-    def on_test_end(self) -> None:
-        self._dump_results(self.results, "results.pkl")
 
     @torch.no_grad()
     def generate(
@@ -217,7 +219,7 @@ class SequenceModelWrapper(pl.LightningModule):
         return hiddens, cells
 
     @classmethod
-    def _dump_results(cls, results: dict[str, Any], filename: str):
+    def dump_results(cls, results: dict[str, Any], filename: str):
         with open(filename, "wb") as f:
             pickle.dump(results, f)
     

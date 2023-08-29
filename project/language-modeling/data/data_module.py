@@ -73,8 +73,10 @@ class PennTreebank(pl.LightningDataModule):
             shuffle=True,
             collate_fn=get_collator(
                 p_reverse=self.p_reverse,
-                tbptt=self.tbptt),
+                tbptt=self.tbptt,
+                tbptt_config=self.tbptt_config),
             num_workers=4)
+
 
     def val_dataloader(self):
         return DataLoader(
@@ -94,10 +96,3 @@ class PennTreebank(pl.LightningDataModule):
 
     def set_reverse(self, reverse: Union[float, None]) -> None:
         self.p_reverse = reverse
-
-    # def predict_dataloader(self):
-        # return DataLoader(self.mnist_predict, batch_size=self.batch_size)
-
-    # def teardown(self, stage: str):
-        # Used to clean-up when the run is finished
-        ...
