@@ -22,7 +22,7 @@ In Table \ref{tab:statistics} I am presenting a summary of the relevant statisti
 
 The PTB dataset appears to be balanced enough, as sents and words are evenly splitted and the mean and standard deviance \(\sigma\) of the words-per-sentence distribution are very similar, being around \(20\) and \(10\).
 
-Moreover, since there are no OOV words, we can rely on the train split to construct the vocabulary. Its length is given by the \(9999\) words, to which I added two more tokens:
+Moreover, since there are no OOV words, we can rely on the train split to construct the vocabulary. Its length is given by the \(9999\) words, to which we added two additional tokens:
 \begin{itemize}
     \item \texttt{<pad>} is a pad token to pad shorter sequences to the length of the longest sequence in a given batch;
     \item \texttt{<eos>} is a sentence terminator token.
