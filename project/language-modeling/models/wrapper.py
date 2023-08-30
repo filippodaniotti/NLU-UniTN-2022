@@ -74,16 +74,15 @@ class SequenceModelWrapper(pl.LightningModule):
         inputs, targets, lengths = batch
         loss, _ = self.forward_wrapper(inputs, targets, lengths)
         _ = self._print_metrics(loss.item(), "Valid")
-        self.validation_step_loss.append(math.exp(loss.item()))
+        self.validation_step_loss.append(loss)
         return loss
     
     def on_validation_epoch_end(self) -> None:
-        if self.ntasgd > -1:
+        if self.ntasgd > -1 and not self.ntasgd_trigger and self.current_epoch > self.ntasgd:
             self.validation_epochs_loss.append(torch.stack(self.validation_step_loss).mean())
             self.validation_step_loss.clear()
-            if (not self.ntasgd_trigger and 
-                    (self.current_epoch >= self.ntasgd and 
-                     self.validation_epochs_loss[-1] > min(self.validation_epochs_loss[:-self.ntasgd]))):
+            is_not_improving = self.validation_epochs_loss[-1] > min(self.validation_epochs_loss[:-self.ntasgd])
+            if is_not_improving:
                 self._switch_to_asgd()
 
     def test_step(self, batch, batch_idx):
@@ -192,7 +191,7 @@ class SequenceModelWrapper(pl.LightningModule):
             batch_loss += loss.item()
         batch_loss /= (split_idx + 1)
         batch_loss = torch.tensor(batch_loss, device=inputs[0].device)
-        return batch_loss
+        return batch_loss, None
 
     def _print_metrics(self, loss: float, stage: str):
         metrics = {f"Loss/{stage}": loss, f"Perplexity/{stage}": math.exp(loss)}

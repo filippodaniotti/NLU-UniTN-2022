@@ -5,10 +5,25 @@ from collections import OrderedDict, defaultdict
 
 from torch import tensor, flip, split
 
+from typing import Any
+
 def get_collator(
         pad_token: int = 0, 
         tbptt: bool = False,
+        tbptt_config: dict[str, Any] | None = None,
         p_reverse: float | None = None) -> callable:
+    
+    def get_tbptt_step(tbptt_config: dict[str, Any]):
+        mu = tbptt_config["mu"]
+        std = tbptt_config["std"]
+        p = tbptt_config["p"]
+
+        mu = mu if np.random.random() < p else mu/2
+        tbptt_step = int(np.random.normal(mu, std))
+        tbptt_step = max(5, tbptt_step)
+        tbptt_step = min(tbptt_step, 82-10)
+
+        return tbptt_step
         
     def collate_fn(data: list[tuple[tensor, tensor, int]]):
         inputs = []
@@ -34,18 +49,24 @@ def get_collator(
         if tbptt:
 
             tbptt_lengths = []
-            tbptt_inputs = defaultdict(list)
-            tbptt_targets = defaultdict(list)
+            tbptt_inputs = OrderedDict()
+            tbptt_targets = OrderedDict()
+
+            step = get_tbptt_step(tbptt_config)
 
             sorted_idxs = np.argsort(lengths)[::-1]
             for word_idx in sorted_idxs:
                 length, inp, tar = lengths[word_idx], inputs[word_idx], targets[word_idx]
                 tbptt_lengths.append(length)
 
-                split_inp = torch.split(inp, 20, dim=0)
-                split_tar = torch.split(tar, 20, dim=0)
+                # print(length, len(inp))
+                split_inp = torch.split(inp, step, dim=0)
+                split_tar = torch.split(tar, step, dim=0)
                 
                 for split_idx, (i, t) in enumerate(zip(split_inp, split_tar)):
+                    if split_idx not in tbptt_inputs:
+                        tbptt_inputs[split_idx] = []
+                        tbptt_targets[split_idx] = []
                     tbptt_inputs[split_idx].append(i)
                     tbptt_targets[split_idx].append(t)
 

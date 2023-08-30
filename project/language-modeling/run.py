@@ -66,6 +66,7 @@ def train(config: dict[str, Any]):
         data_dir = config["dataset"]["ds_path"], 
         batch_size = config["experiment"]["batch_size"],
         tbptt= bool(config["experiment"]["tbptt"]),
+        tbptt_config = config["experiment"]["tbptt_config"],
     )
     ptb.prepare_data() 
     logger = pl.loggers.TensorBoardLogger(
@@ -78,6 +79,7 @@ def train(config: dict[str, Any]):
         cost_function = get_cost_function(config),
         optimizer = config["experiment"]["optimizer"],
         learning_rate = float(config["experiment"]["learning_rate"]),
+        ntasgd = config["experiment"]["ntasgd"],
         tbptt = bool(config["experiment"]["tbptt"]),
         batch_size = config["experiment"]["batch_size"],
     )
@@ -109,7 +111,7 @@ def evaluate(config: dict[str, Any]):
 def inference(
         config: dict[str, Any],
         prompt: str,
-        mode: str,
+        mode: str = "argmax",
     ):
     with open("lang.pkl", "rb") as f:
         lang = pickle.load(f)
@@ -176,7 +178,7 @@ if __name__ == "__main__":
     with open(args.config_path) as config_file:
         config = yaml.safe_load(config_file)
     if args.inference:
-        inference(config, prompt=args.prompt, mode=args.mode)
+        inference(config, prompt=args.prompt)
     elif args.train:
         train(config)
     elif args.evaluate:

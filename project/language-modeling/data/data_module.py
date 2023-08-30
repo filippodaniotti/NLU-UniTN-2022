@@ -6,7 +6,7 @@ import datasets as hf_datasets
 import pytorch_lightning as pl
 from torch.utils.data.dataloader import DataLoader
 
-from typing import Union
+from typing import Union, Any
 
 from .lang import Lang
 from .custom_datasets import SentsDataset
@@ -19,6 +19,7 @@ class PennTreebank(pl.LightningDataModule):
             temp_zip_name = "ptb.zip",
             batch_size: int = 64,
             tbptt: bool = False,
+            tbptt_config: dict[str, Any] | None = None,
             p_reverse: float = None):
         super().__init__()
         self.download_url = download_url
@@ -26,6 +27,7 @@ class PennTreebank(pl.LightningDataModule):
         self.temp_zip_name = temp_zip_name
         self.batch_size = batch_size
         self.tbptt = tbptt
+        self.tbptt_config = tbptt_config
         self.p_reverse = p_reverse
 
         # placeholders
