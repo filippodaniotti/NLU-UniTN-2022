@@ -8,7 +8,7 @@ class Lang():
             eos_token: int = None, 
             cutoff: int = 0,
             parse_sents: bool = False):
-        words = elements if not parse_sents else self.get_words_from_sents(elements)            
+        words = elements if not parse_sents else self.flatten_sentences(elements)            
         self.words2ids, self.ids2words = self.map_tokens(
             words, pad_value, eos_token, cutoff=cutoff)
         
@@ -43,7 +43,7 @@ class Lang():
 
         return w2id, id2w
 
-    def get_words_from_sents(self, sents: list[str]) -> list[str]:
+    def flatten_sentences(self, sents: list[str]) -> list[str]:
         words = []
         for sent in sents:
             words.extend(sent.split())

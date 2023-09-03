@@ -89,11 +89,12 @@ def train(config: dict[str, Any]):
         ntasgd = config["experiment"]["ntasgd"],
         asgd_lr = float(config["experiment"]["asgd_lr"]),
         tbptt = bool(config["experiment"]["tbptt"]),
+        tbptt_config = config["experiment"]["tbptt_config"],
         batch_size = config["experiment"]["batch_size"],
     )
     trainer.fit(model=model, datamodule=ptb)
 
-def evaluate(config: dict[str, Any]):
+def evaluate(config: dict[str, Any], dump_results: bool | None):
     ptb = PennTreebank(
         download_url = config["dataset"]["ds_url"], 
         data_dir = config["dataset"]["ds_path"], 
@@ -109,7 +110,7 @@ def evaluate(config: dict[str, Any]):
         cost_function = get_cost_function(config),
         batch_size = 1,
     )
-    # trainer.test(model=model, datamodule=ptb)
+    trainer.test(model=model, datamodule=ptb)
     results_path = join(
         *(config["experiment"]["checkpoint_path"])[:-2], 
         f'{config["experiment"]["experiment_name"]}.pkl')
@@ -117,7 +118,8 @@ def evaluate(config: dict[str, Any]):
     loss_mean = df["loss"].mean()
     print(f"Test loss: {loss_mean}")
     print(f"Test pplx: {math.exp(loss_mean)}")
-    # SequenceModelWrapper.dump_results(model.results, results_path)
+    if dump_results:
+        SequenceModelWrapper.dump_results(model.results, results_path)
 
 def inference(
         config: dict[str, Any],
@@ -171,6 +173,13 @@ if __name__ == "__main__":
         help="Flag for evaluation mode"
     )
     parser.add_argument(
+        "-d", 
+        "--dump-results", 
+        action="store_true", 
+        dest="dump_results", 
+        help="Flag for dumping results object after test run"
+    )
+    parser.add_argument(
         "-i", 
         "--inference", 
         action="store_true", 
@@ -192,22 +201,15 @@ if __name__ == "__main__":
         default="the",
         help="Prompt for inference mode",
     )
-    # parser.add_argument(
-    #     "-m",
-    #     "--mode",
-    #     type=str,
-    #     dest="mode",
-    #     default="argmax",
-    #     help="Mode for inference mode",
-    # )
 
     args = parser.parse_args()
     config = load_config(args.config_path)
     if args.train:
         train(config)
     elif args.evaluate:
-        evaluate(config)
+        evaluate(config, args.dump_results)
     elif args.inference:
+        inference_config_path = args.inference_config_path | join("configs", "inference.yaml")
         inference_config = load_config(args.inference_config_path)
         inference(
             config, 

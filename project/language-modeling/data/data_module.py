@@ -10,7 +10,7 @@ from typing import Union, Any
 
 from .lang import Lang
 from .custom_datasets import SentsDataset
-from .collators import get_collator
+from .collator import get_collator
 
 class PennTreebank(pl.LightningDataModule):
     def __init__(self,
@@ -18,16 +18,12 @@ class PennTreebank(pl.LightningDataModule):
             data_dir: str,
             temp_zip_name = "ptb.zip",
             batch_size: int = 64,
-            tbptt: bool = False,
-            tbptt_config: dict[str, Any] | None = None,
             p_reverse: float = None):
         super().__init__()
         self.download_url = download_url
         self.data_dir = data_dir
         self.temp_zip_name = temp_zip_name
         self.batch_size = batch_size
-        self.tbptt = tbptt
-        self.tbptt_config = tbptt_config
         self.p_reverse = p_reverse
 
         # placeholders
@@ -74,9 +70,7 @@ class PennTreebank(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=True,
             collate_fn=get_collator(
-                p_reverse=self.p_reverse,
-                tbptt=self.tbptt,
-                tbptt_config=self.tbptt_config),
+                p_reverse=self.p_reverse),
             num_workers=4)
 
 

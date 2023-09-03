@@ -1,11 +1,9 @@
 import numpy as np
-import torch
 import torch.nn as nn
+from torch import stack, zeros, tensor
 
 from .lstm import BaselineLSTM
 from .dropout import LockedDropout, WeightDropLSTM, EmbeddingDropout
-
-from torch import tensor
 
 class MerityLSTM(BaselineLSTM):
     def __init__(
@@ -67,7 +65,6 @@ class MerityLSTM(BaselineLSTM):
             hiddens: tuple[tensor, tensor] | None = None,
             split_idx: int | None = 0,
         ):
-        batch_size = inputs.shape[0]
         # embedding dropout
         embedding = self.embedding(inputs)
         # in locked dropout
@@ -75,10 +72,10 @@ class MerityLSTM(BaselineLSTM):
         packed_inputs = nn.utils.rnn.pack_padded_sequence(embedding, lengths, batch_first=True, enforce_sorted=False)
 
         if split_idx is not None and split_idx > 0:
-            h_n, c_n = torch.stack(hiddens[0], dim=0), torch.stack(hiddens[1], dim=0)
-            h_n = h_n[:, :inputs.shape[0], :]
-            c_n = c_n[:, :inputs.shape[0], :]
-            hiddens = [h_n, c_n]
+            h_n, c_n = stack(hiddens[0], dim=0), stack(hiddens[1], dim=0)
+            h_n = h_n[:, :inputs.shape[0], :].contiguous()
+            c_n = c_n[:, :inputs.shape[0], :].contiguous()
+            hiddens = (h_n, c_n)
 
         packed_outputs, hiddens = self.lstm(packed_inputs, hiddens)
         outputs, _ = nn.utils.rnn.pad_packed_sequence(packed_outputs, batch_first=True)
@@ -95,23 +92,23 @@ class MerityLSTM(BaselineLSTM):
                     if 'weight_ih' in name:
                         for idx in range(4):
                             mul = param.shape[0]//4
-                            torch.nn.init.xavier_uniform_(
+                            nn.init.xavier_uniform_(
                                 param[idx*mul:(idx+1)*mul])
                     elif 'weight_hh' in name:
                         for idx in range(4):
                             mul = param.shape[0]//4
-                            torch.nn.init.xavier_uniform_(
+                            nn.init.xavier_uniform_(
                                 param[idx*mul:(idx+1)*mul])
                     elif 'bias' in name:
                         param.data.fill_(0)
             else:
                 if type(m) in [nn.Embedding]:
-                    torch.nn.init.uniform_(m.weight, -0.1, 0.1)
+                    nn.init.uniform_(m.weight, -0.1, 0.1)
                 elif type(m) in [nn.Linear]:
                     if m.bias != None:
                         m.bias.data.fill_(0.1)
 
     def _init_hidden(self, batch_size, device):
-        hidden = torch.zeros(self.num_layers, batch_size, self.hidden_dim, device=device)
-        cell = torch.zeros(self.num_layers, batch_size, self.hidden_dim, device=device)
+        hidden = zeros(self.num_layers, batch_size, self.hidden_dim, device=device)
+        cell = zeros(self.num_layers, batch_size, self.hidden_dim, device=device)
         return hidden, cell

@@ -13,6 +13,7 @@ from models.merity import MerityLSTM
 from data.data_module import Lang
 
 from typing import Any
+from torch import tensor
 
 class SequenceModelWrapper(pl.LightningModule):
     def __init__(
@@ -25,6 +26,7 @@ class SequenceModelWrapper(pl.LightningModule):
             ntasgd: int = -1,
             asgd_lr: float | None = None,
             tbptt: bool = False,
+            tbptt_config: dict[str, Any] | None = None,
             batch_size: int = 128):
         super().__init__()
 
@@ -34,6 +36,7 @@ class SequenceModelWrapper(pl.LightningModule):
         self.lr = learning_rate
         self.momentum = momentum
         self.batch_size = batch_size
+        self.pad_value = self.model.pad_value
 
         if optimizer not in ["sgd", "adam"]:
             raise ValueError("Please provide either 'sgd' or 'adam' as optimizer")
@@ -46,16 +49,17 @@ class SequenceModelWrapper(pl.LightningModule):
         self.validation_epochs_loss = []
 
         self.tbptt = tbptt
-        if tbptt:
-            self.automatic_optimization = False
+        self.tbptt_config = tbptt_config
+        # disable automatic optimization when using tbptt
+        self.automatic_optimization = not tbptt
 
         self.results = []
 
     def forward(
             self,
-            inputs: torch.Tensor,
+            inputs: tensor,
             lengths: list[int],
-            hidden: list[torch.Tensor] | None = None,
+            hidden: list[tensor] | None = None,
             split_idx: int | None = 0,):
         if self.tbptt:
             if split_idx is None:
@@ -64,15 +68,23 @@ class SequenceModelWrapper(pl.LightningModule):
         else:
             return self.model(inputs, lengths, hidden)
 
-    def training_step(self, batch: tuple[torch.tensor, torch.tensor], batch_idx: int):
+    def training_step(self, batch: tuple[tensor, tensor], batch_idx: int):
         inputs, targets, lengths = batch
         forward_step = self.forward_wrapper if not self.tbptt else self.tbptt_forward_wrapper
         loss, _ = forward_step(inputs, targets, lengths)
         self._print_metrics(loss.item(), "Train")
         return loss
+    
+
+    def on_train_epoch_end(self):
+        try: 
+            sch = self.lr_schedulers()
+            sch.step(self.trainer.callback_metrics["Loss/Valid"])
+        except KeyError:
+            pass
 
 
-    def validation_step(self, batch: tuple[torch.tensor, torch.tensor], batch_idx: int):
+    def validation_step(self, batch: tuple[tensor, tensor], batch_idx: int):
         inputs, targets, lengths = batch
         loss, _ = self.forward_wrapper(inputs, targets, lengths)
         self._print_metrics(loss.item(), "Valid")
@@ -166,19 +178,19 @@ class SequenceModelWrapper(pl.LightningModule):
     def forward_wrapper(self, inputs, targets, lengths):
         outputs, _ = self(inputs, lengths)
         loss = self.cost_fn(outputs, targets.view(-1))
+        print(f"batch_loss_avg={loss}")
         return loss, outputs
     
     def tbptt_forward_wrapper(self, inputs, targets, lengths):
+        inputs, targets = self.tbptt_split_batch(inputs, targets)
         hiddens = self._init_hidden(inputs[0].shape[0], inputs[0].device)
+
         batch_loss = .0
         opt = self.optimizers()
-        sch = self.lr_schedulers()
         for split_idx, (inps, tars) in enumerate(zip(inputs, targets)):
-            # compute lengths depending on the current split
-            lengths = torch.where(inps != 0, 1, 0).cpu()
-            lengths = torch.sum(lengths, dim=1)
             if split_idx > 0:
                 hiddens = self._detach_hidden(hiddens)
+            lengths = torch.sum(inps.ne(self.pad_value), dim=1)
             outputs, hiddens = self(inps, lengths, hiddens, split_idx)
             opt.zero_grad()
             loss = self.cost_fn(outputs, tars.view(-1))
@@ -186,14 +198,41 @@ class SequenceModelWrapper(pl.LightningModule):
             # clip gradients
             self.clip_gradients(opt, gradient_clip_val=0.25, gradient_clip_algorithm="norm")
             opt.step()
-            try: 
-                sch.step(self.trainer.callback_metrics["Loss/Valid"])
-            except KeyError:
-                pass
             batch_loss += loss.item()
+
         batch_loss /= (split_idx + 1)
         batch_loss = torch.tensor(batch_loss, device=inputs[0].device)
         return batch_loss, None
+    
+    def tbptt_split_batch(self, inputs, targets):
+        split_step = self.get_split_step()
+        inputs = list(torch.split(inputs, split_step, dim=1))
+        targets = list(torch.split(targets, split_step, dim=1))
+
+        # pad last batch
+        if inputs[-1].shape[1] < split_step:
+            inputs[-1] = F.pad(inputs[-1], (0, split_step - inputs[-1].shape[1]))
+            targets[-1] = F.pad(targets[-1], (0, split_step - inputs[-1].shape[1]))
+
+        # remove empty sentences and batches
+        get_length = lambda x: torch.sum(x.ne(self.pad_value)).item()
+        for split_idx in range(len(inputs)):
+            inputs[split_idx] = torch.stack([i for i in inputs[split_idx] if get_length(i) > 0])
+            targets[split_idx] = torch.stack([t for t in targets[split_idx] if get_length(t) > 0])
+
+        return inputs, targets
+    
+    def get_split_step(self):
+        mu = self.tbptt_config["mu"]
+        std = self.tbptt_config["std"]
+        p = self.tbptt_config["p"]
+
+        mu = mu if np.random.random() < p else mu/2
+        split_step = int(np.random.normal(mu, std))
+        # split_step = max(5, split_step)
+        # split_step = min(split_step, 72)
+
+        return split_step
 
     def _print_metrics(self, loss: float, stage: str) -> None:
         metrics = {f"Loss/{stage}": loss, f"Perplexity/{stage}": math.exp(loss)}
@@ -203,7 +242,6 @@ class SequenceModelWrapper(pl.LightningModule):
         self.print(f"Using NT-ASGD at epoch {self.current_epoch}")
         self.ntasgd_trigger = True
         # https://pytorch-lightning.readthedocs.io/en/stable/_modules/pytorch_lightning/core/optimizer.html#LightningOptimizer
-        # Note by the author: thank God Python does not have private attributes
         self.optimizers()._optimizer = torch.optim.ASGD(
             self.parameters(),
             lr=self.asgd_lr,
@@ -239,7 +277,6 @@ class SequenceModelWrapper(pl.LightningModule):
         state_dict = torch.load(checkpoint_path, map_location=map_location)["state_dict"]
 
         if isinstance(model, MerityLSTM):
-            print("")
             to_rmv = []
             for k in state_dict.keys():
                 if k.startswith("model.old_lstm.weight_hh") and (not k.endswith('_raw')):

@@ -1,6 +1,7 @@
 import numpy as np
-import torch
 import torch.nn as nn
+
+from torch import tensor
 
 class BaselineLSTM(nn.Module):
     def __init__(
@@ -31,13 +32,13 @@ class BaselineLSTM(nn.Module):
 
     def forward(
             self,
-            inputs: torch.Tensor,
+            inputs: tensor,
             lengths: np.ndarray[int],
-            hidden: list[torch.Tensor] | None = None):
+            hidden: list[tensor] | None = None):
         embedding = self.embedding(inputs)
         packed_inputs = nn.utils.rnn.pack_padded_sequence(embedding, lengths, batch_first=True, enforce_sorted=False)
         packed_outputs, (hidden, cell) = self.lstm(packed_inputs, hidden)
-        outputs, output_lenghts = nn.utils.rnn.pad_packed_sequence(packed_outputs, batch_first=True)
+        outputs, _ = nn.utils.rnn.pad_packed_sequence(packed_outputs, batch_first=True)
         if self.norm is not None:
             outputs = self.norm(outputs)
         if self.dropout is not None:
