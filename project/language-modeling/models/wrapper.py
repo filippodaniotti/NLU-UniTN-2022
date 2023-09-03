@@ -68,14 +68,14 @@ class SequenceModelWrapper(pl.LightningModule):
         inputs, targets, lengths = batch
         forward_step = self.forward_wrapper if not self.tbptt else self.tbptt_forward_wrapper
         loss, _ = forward_step(inputs, targets, lengths)
-        _ = self._print_metrics(loss.item(), "Train")
+        self._print_metrics(loss.item(), "Train")
         return loss
 
 
     def validation_step(self, batch: tuple[torch.tensor, torch.tensor], batch_idx: int):
         inputs, targets, lengths = batch
         loss, _ = self.forward_wrapper(inputs, targets, lengths)
-        _ = self._print_metrics(loss.item(), "Valid")
+        self._print_metrics(loss.item(), "Valid")
         self.validation_step_loss.append(loss)
         return loss
     
@@ -90,7 +90,7 @@ class SequenceModelWrapper(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         inputs, targets, lengths = batch
         loss, outputs = self.forward_wrapper(inputs, targets, lengths)
-        metrics = self._print_metrics(loss.item(), "Test")
+        self._print_metrics(loss.item(), "Test")
         self.results.append({
             "inputs": inputs.cpu().numpy().squeeze(),
             "targets": targets.cpu().numpy().squeeze(),
@@ -98,7 +98,7 @@ class SequenceModelWrapper(pl.LightningModule):
             "outputs": outputs.cpu().numpy(),
             "loss": loss.cpu().numpy(),
         })
-        return metrics
+        return loss
 
     @torch.no_grad()
     def generate(
@@ -169,7 +169,7 @@ class SequenceModelWrapper(pl.LightningModule):
         return loss, outputs
     
     def tbptt_forward_wrapper(self, inputs, targets, lengths):
-        hiddens = self.model._init_hidden(inputs[0].shape[0])
+        hiddens = self._init_hidden(inputs[0].shape[0], inputs[0].device)
         batch_loss = .0
         opt = self.optimizers()
         sch = self.lr_schedulers()
@@ -195,10 +195,9 @@ class SequenceModelWrapper(pl.LightningModule):
         batch_loss = torch.tensor(batch_loss, device=inputs[0].device)
         return batch_loss, None
 
-    def _print_metrics(self, loss: float, stage: str):
+    def _print_metrics(self, loss: float, stage: str) -> None:
         metrics = {f"Loss/{stage}": loss, f"Perplexity/{stage}": math.exp(loss)}
         self.log_dict(metrics, prog_bar=True, on_epoch=True, on_step=False, batch_size=self.batch_size)
-        return metrics
     
     def _switch_to_asgd(self):
         self.print(f"Using NT-ASGD at epoch {self.current_epoch}")
@@ -212,6 +211,9 @@ class SequenceModelWrapper(pl.LightningModule):
             lambd=0.,
             weight_decay=1e-6)
         self.lr_schedulers().optimizer = self.optimizers()._optimizer
+
+    def _init_hidden(self, batch_size: int, device: torch.device):
+        return self.model._init_hidden(batch_size, device)
 
     def _detach_hidden(self, hiddens):
         hiddens, cells = hiddens

@@ -111,7 +111,7 @@ class MerityLSTM(BaselineLSTM):
                     if m.bias != None:
                         m.bias.data.fill_(0.1)
 
-    def _init_hidden(self, batch_size):
-        hidden = torch.zeros(self.num_layers, batch_size, self.hidden_dim)
-        cell = torch.zeros(self.num_layers, batch_size, self.hidden_dim)
+    def _init_hidden(self, batch_size, device):
+        hidden = torch.zeros(self.num_layers, batch_size, self.hidden_dim, device=device)
+        cell = torch.zeros(self.num_layers, batch_size, self.hidden_dim, device=device)
         return hidden, cell
