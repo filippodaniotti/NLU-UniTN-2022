@@ -34,7 +34,7 @@ model:
   hidden_dim: 400
   num_layers: 3
   locked_dropout: True
-  p_lockdrop: .1
+  p_lockdrop: .4
   embedding_dropout: True
   p_embdrop: .1
   weight_dropout: True

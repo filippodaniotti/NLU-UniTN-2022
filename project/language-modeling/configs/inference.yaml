@@ -1,0 +1,5 @@
+mode: argmax
+allow_unk: False
+max_length: 30
+lang_path: 
+  - lang.pkl

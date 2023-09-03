@@ -20,6 +20,10 @@ from models.wrapper import SequenceModelWrapper
 
 from typing import Any
 
+def load_config(config_path: str) -> dict[str, Any]:
+    with open(config_path) as config_file:
+        return yaml.safe_load(config_file)
+
 def get_device() -> torch.device:
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -119,8 +123,11 @@ def inference(
         config: dict[str, Any],
         prompt: str,
         mode: str = "argmax",
+        lang_path: str = "lang.pkl",
+        max_len: int = 30,
+        allow_unk: bool = False,
     ):
-    with open("lang.pkl", "rb") as f:
+    with open(lang_path, "rb") as f:
         lang = pickle.load(f)
     model = SequenceModelWrapper.load_model(
         checkpoint_path = join(*config["experiment"]["checkpoint_path"]),
@@ -131,7 +138,13 @@ def inference(
 
     temperatures = [0.5, 0.7, 0.75, 0.8, 1.0]
     for temp in temperatures:
-        generated = model.generate(prompt, lang, mode=mode, temperature=temp)
+        generated = model.generate(
+            prompt, 
+            lang, 
+            mode=mode, 
+            max_len=max_len,
+            allow_unk=allow_unk,
+            temperature=temp)
         print(f"t:{temp} => {generated}")
 
 if __name__ == "__main__":
@@ -165,6 +178,13 @@ if __name__ == "__main__":
         help="Flag for inference mode"
     )
     parser.add_argument(
+        "-ic", 
+        "--inference-config", 
+        type=str, 
+        dest="inference_config_path", 
+        help="Path of inference configuration file"
+    )
+    parser.add_argument(
         "-p",
         "--prompt",
         type=str,
@@ -182,14 +202,21 @@ if __name__ == "__main__":
     # )
 
     args = parser.parse_args()
-    with open(args.config_path) as config_file:
-        config = yaml.safe_load(config_file)
-    if args.inference:
-        inference(config, prompt=args.prompt)
-    elif args.train:
+    config = load_config(args.config_path)
+    if args.train:
         train(config)
     elif args.evaluate:
         evaluate(config)
+    elif args.inference:
+        inference_config = load_config(args.inference_config_path)
+        inference(
+            config, 
+            prompt=args.prompt,
+            mode=inference_config["mode"],
+            max_len=inference_config["max_len"],
+            allow_unk=inference_config["allow_unk"],
+            lang_path=inference_config["lang_path"],
+        )
     else:
         raise ValueError("Please provide a supported mode flag ('-t', '-e', '-i')")
     

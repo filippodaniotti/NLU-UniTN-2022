@@ -35,9 +35,9 @@ model:
   init_weights: True
   tie_weights: True
   locked_dropout: True
-  p_lockdrop: .1
+  p_lockdrop: .65
   embedding_dropout: True
-  p_embdrop: .1
+  p_embdrop: .2
   weight_dropout: True
-  p_lstmdrop: .3
+  p_lstmdrop: .4
   p_hiddrop: .0
