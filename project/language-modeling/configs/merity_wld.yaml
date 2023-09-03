@@ -1,0 +1,43 @@
+dataset:
+  ds_url: https://data.deepai.org/ptbdataset.zip
+  ds_path: penn_treebank
+  pad_value: 0
+
+results: 
+  logs_path: runs
+
+experiment:
+  experiment_name: merity_base
+  checkpoint_path: 
+    - runs
+    - merity_base
+    - version_0
+    - checkpoints
+    - epoch=49-step=16450.ckpt
+  epochs: 50
+  batch_size: 128
+  model: merity
+  optimizer: sgd
+  learning_rate: 1
+  ntasgd: 3
+  asgd_lr: 1
+  gradient_clip_val: 0.25
+  tbptt: False
+  # tbptt_config:
+  #   mu: 40
+  #   std: 5
+  #   p: .95
+
+model:
+  embedding_dim: 400
+  hidden_dim: 400
+  num_layers: 3
+  locked_dropout: True
+  p_lockdrop: .1
+  embedding_dropout: False
+  p_embdrop: .1
+  weight_dropout: True
+  p_lstmdrop: .3
+  p_hiddrop: .5
+  init_weights: True
+  tie_weights: True

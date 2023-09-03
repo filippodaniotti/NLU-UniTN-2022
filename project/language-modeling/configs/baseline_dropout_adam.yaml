@@ -12,12 +12,12 @@ experiment:
   epochs: 50
   batch_size: 128
   model: baseline
-  optimizer: sgd
-  learning_rate: 1
+  optimizer: adam
+  learning_rate: 1e-3
   tbptt: False
 
 model:
   embedding_dim: 300
   hidden_dim: 300
   num_layers: 1
-  p_dropout: .0
+  p_dropout: .5
