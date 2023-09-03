@@ -23,6 +23,7 @@ class SequenceModelWrapper(pl.LightningModule):
             momentum: float = 0.9,
             optimizer: str = "sgd",
             ntasgd: int = -1,
+            asgd_lr: float | None = None,
             tbptt: bool = False,
             batch_size: int = 128):
         super().__init__()
@@ -40,6 +41,7 @@ class SequenceModelWrapper(pl.LightningModule):
         self.optimizer = optimizer
         self.ntasgd = ntasgd
         self.ntasgd_trigger = False
+        self.asgd_lr = asgd_lr
         self.validation_step_loss = []
         self.validation_epochs_loss = []
 
@@ -78,11 +80,11 @@ class SequenceModelWrapper(pl.LightningModule):
         return loss
     
     def on_validation_epoch_end(self) -> None:
+        self.validation_epochs_loss.append(torch.stack(self.validation_step_loss).mean())
+        self.validation_step_loss.clear()
         if self.ntasgd > -1 and not self.ntasgd_trigger and self.current_epoch > self.ntasgd:
-            self.validation_epochs_loss.append(torch.stack(self.validation_step_loss).mean())
-            self.validation_step_loss.clear()
-            is_not_improving = self.validation_epochs_loss[-1] > min(self.validation_epochs_loss[:-self.ntasgd])
-            if is_not_improving:
+            # if not improving
+            if self.validation_epochs_loss[-1] > min(self.validation_epochs_loss[:-self.ntasgd]):
                 self._switch_to_asgd()
 
     def test_step(self, batch, batch_idx):
@@ -90,11 +92,11 @@ class SequenceModelWrapper(pl.LightningModule):
         loss, outputs = self.forward_wrapper(inputs, targets, lengths)
         metrics = self._print_metrics(loss.item(), "Test")
         self.results.append({
-            "inputs": inputs.numpy().squeeze(),
-            "targets": targets.numpy().squeeze(),
+            "inputs": inputs.cpu().numpy().squeeze(),
+            "targets": targets.cpu().numpy().squeeze(),
             "lengths": lengths,
-            "outputs": outputs.numpy(),
-            "loss": loss.numpy(),
+            "outputs": outputs.cpu().numpy(),
+            "loss": loss.cpu().numpy(),
         })
         return metrics
 
@@ -118,11 +120,11 @@ class SequenceModelWrapper(pl.LightningModule):
         prompt = prompt.lower().split(" ")
         text = [lang.words2ids[w] for w in prompt]
         hidden = self.model._init_hidden(1)
-        pred = None
+        pred = ""
 
         while pred != lang.words2ids["<eos>"] and len(text) < max_len:
             inp = torch.tensor(text).unsqueeze(0)
-            length = np.asarray([len(text)], dtype=np.int64)
+            length = np.asarray([len(text)], dtype=np.int32)
             output, hidden = self(inp, length, hidden)
             output = output[-1, :].unsqueeze(0)
             softmax = torch.softmax(output / temperature, dim=1)
@@ -205,7 +207,7 @@ class SequenceModelWrapper(pl.LightningModule):
         # Note by the author: thank God Python does not have private attributes
         self.optimizers()._optimizer = torch.optim.ASGD(
             self.parameters(),
-            lr=self.lr,
+            lr=self.asgd_lr,
             t0=0,
             lambd=0.,
             weight_decay=1e-6)

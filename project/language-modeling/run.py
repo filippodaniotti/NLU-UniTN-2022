@@ -1,8 +1,11 @@
 import yaml
+import math
 import pickle
 import numpy as np
+import pandas as pd
 from os.path import join
 from argparse import ArgumentParser
+
 
 import torch
 import torch.nn as nn
@@ -80,6 +83,7 @@ def train(config: dict[str, Any]):
         optimizer = config["experiment"]["optimizer"],
         learning_rate = float(config["experiment"]["learning_rate"]),
         ntasgd = config["experiment"]["ntasgd"],
+        asgd_lr = float(config["experiment"]["asgd_lr"]),
         tbptt = bool(config["experiment"]["tbptt"]),
         batch_size = config["experiment"]["batch_size"],
     )
@@ -105,7 +109,10 @@ def evaluate(config: dict[str, Any]):
     results_path = join(
         *(config["experiment"]["checkpoint_path"])[:-2], 
         f'{config["experiment"]["experiment_name"]}.pkl')
-    print(results_path)
+    df = pd.DataFrame(model.results)
+    loss_mean = df["loss"].mean()
+    print(f"Test loss: {loss_mean}")
+    print(f"Test pplx: {math.exp(loss_mean)}")
     # SequenceModelWrapper.dump_results(model.results, results_path)
 
 def inference(
