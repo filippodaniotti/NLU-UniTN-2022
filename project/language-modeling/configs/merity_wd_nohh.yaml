@@ -7,6 +7,7 @@ results:
   logs_path: runs
 
 experiment:
+  seed: 42
   experiment_name: merity_base
   checkpoint_path: 
     - runs
@@ -34,6 +35,8 @@ model:
   num_layers: 3
   init_weights: True
   tie_weights: True
+  embedding_dropout: False
+  p_embdrop: .1
   weight_dropout: True
   p_lstmdrop: .3
   p_hiddrop: .0

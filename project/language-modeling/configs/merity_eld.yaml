@@ -7,6 +7,7 @@ results:
   logs_path: runs
 
 experiment:
+  seed: 42
   experiment_name: merity_base
   checkpoint_path: 
     - runs
@@ -23,10 +24,10 @@ experiment:
   asgd_lr: 1
   gradient_clip_val: 0.25
   tbptt: False
-  # tbptt_config:
-  #   mu: 40
-  #   std: 5
-  #   p: .95
+  tbptt_config:
+    mu: 40
+    std: 5
+    p: .95
 
 model:
   embedding_dim: 400
@@ -38,3 +39,6 @@ model:
   p_lockdrop: .4
   embedding_dropout: True
   p_embdrop: .1
+  weight_dropout: False
+  p_lstmdrop: .3
+  p_hiddrop: .5

@@ -8,10 +8,10 @@ results:
 
 experiment:
   seed: 42
-  experiment_name: merity_base
+  experiment_name: merity_tbptt
   checkpoint_path: 
     - runs
-    - merity_base
+    - merity_tbptt
     - version_0
     - checkpoints
     - epoch=49-step=16450.ckpt
