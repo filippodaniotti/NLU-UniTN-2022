@@ -178,7 +178,6 @@ class SequenceModelWrapper(pl.LightningModule):
     def forward_wrapper(self, inputs, targets, lengths):
         outputs, _ = self(inputs, lengths)
         loss = self.cost_fn(outputs, targets.view(-1))
-        print(f"batch_loss_avg={loss}")
         return loss, outputs
     
     def tbptt_forward_wrapper(self, inputs, targets, lengths):

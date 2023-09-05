@@ -1,0 +1,31 @@
+dataset:
+  ds_url: https://data.deepai.org/ptbdataset.zip
+  ds_path: penn_treebank
+  pad_value: 0
+
+results: 
+  logs_path: runs
+
+experiment:
+  seed: 42
+  experiment_name: mogrifier_base
+  checkpoint_path: 
+    - runs
+    - mogrifier_base
+    - version_0
+    - checkpoints
+    - epoch=49-step=16450.ckpt
+  epochs: 50
+  batch_size: 128
+  model: mogrifier
+  optimizer: sgd
+  learning_rate: 1
+  gradient_clip_val: 0.25
+
+model:
+  embedding_dim: 400
+  hidden_dim: 400
+  num_layers: 3
+  p_dropout: .5
+  tie_weights: True
+  mogrify_steps: 5

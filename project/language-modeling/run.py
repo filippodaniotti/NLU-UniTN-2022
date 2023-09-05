@@ -14,9 +14,7 @@ import torch.multiprocessing
 torch.multiprocessing.set_sharing_strategy('file_system')
 
 from data.data_module import PennTreebank 
-from models.lstm import BaselineLSTM
-from models.merity import MerityLSTM
-from models.wrapper import SequenceModelWrapper
+from models import BaselineLSTM, MerityLSTM, MogrifierLSTM, SequenceModelWrapper
 
 from typing import Any
 
@@ -59,8 +57,19 @@ def get_model(config: dict[str, Any], vocab_size: int) -> nn.Module:
             tie_weights = bool(config["model"]["tie_weights"]),
             pad_value = config["dataset"]["pad_value"]
         )
+    elif config["experiment"]["model"] == "mogrifier":
+        return MogrifierLSTM(
+            num_classes = vocab_size,
+            embedding_dim = config["model"]["embedding_dim"],
+            hidden_dim = config["model"]["hidden_dim"],
+            num_layers = config["model"]["num_layers"],
+            mogrify_steps = config["model"]["mogrify_steps"],
+            tie_weights = bool(config["model"]["tie_weights"]),
+            p_dropout = config["model"]["p_dropout"],
+            pad_value = config["dataset"]["pad_value"]
+        )
     else:
-        raise ValueError("Provided model not available.")
+        raise ValueError(f"Provided model '{config['experiment']['model']}' not available.")
     
 
 def get_cost_function(config: dict[str, Any]) -> nn.Module:
@@ -72,8 +81,6 @@ def train(config: dict[str, Any]):
         download_url = config["dataset"]["ds_url"], 
         data_dir = config["dataset"]["ds_path"], 
         batch_size = config["experiment"]["batch_size"],
-        tbptt= bool(config["experiment"]["tbptt"]),
-        tbptt_config = config["experiment"]["tbptt_config"],
     )
     ptb.prepare_data() 
     logger = pl.loggers.TensorBoardLogger(
@@ -86,10 +93,10 @@ def train(config: dict[str, Any]):
         cost_function = get_cost_function(config),
         optimizer = config["experiment"]["optimizer"],
         learning_rate = float(config["experiment"]["learning_rate"]),
-        ntasgd = config["experiment"]["ntasgd"],
-        asgd_lr = float(config["experiment"]["asgd_lr"]),
-        tbptt = bool(config["experiment"]["tbptt"]),
-        tbptt_config = config["experiment"]["tbptt_config"],
+        ntasgd = config["experiment"].get("ntasgd", -1),
+        asgd_lr = float(config["experiment"].get("asgd_lr", .0)),
+        tbptt = bool(config["experiment"].get("tbptt", False)),
+        tbptt_config = config["experiment"].get("tbptt_config", None),
         batch_size = config["experiment"]["batch_size"],
     )
     trainer.fit(model=model, datamodule=ptb)
@@ -99,7 +106,6 @@ def evaluate(config: dict[str, Any], dump_results: bool | None):
         download_url = config["dataset"]["ds_url"], 
         data_dir = config["dataset"]["ds_path"], 
         batch_size = 1,
-        tbptt= bool(config["experiment"]["tbptt"]),
     )
     ptb.prepare_data()
     trainer = pl.Trainer(logger=False)
