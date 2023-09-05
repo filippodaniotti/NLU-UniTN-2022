@@ -8,9 +8,8 @@ import torch.optim as optim
 import torch.nn.functional as F
 import pytorch_lightning as pl
 
-from models.lstm import BaselineLSTM
-from models.merity import MerityLSTM
-from data.data_module import Lang
+from models import MerityLSTM
+from data import Lang
 
 from typing import Any
 from torch import tensor

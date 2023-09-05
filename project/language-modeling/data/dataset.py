@@ -4,9 +4,9 @@ from torch.utils.data import Dataset
 
 class SentsDataset(Dataset):
     def __init__(self, sents: list[str], w2i: dict[str, int]) -> None:
-        inputs = []
-        targets = []
-        lengths = []
+        inputs: list[list[int]] = []
+        targets: list[list[int]] = []
+        lengths: list[int] = []
 
         for sent in sents:
             words = sent.split() + ['<eos>']

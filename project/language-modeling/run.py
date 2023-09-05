@@ -13,7 +13,7 @@ import pytorch_lightning as pl
 import torch.multiprocessing
 torch.multiprocessing.set_sharing_strategy('file_system')
 
-from data.data_module import PennTreebank 
+from data import PennTreebank, Lang
 from models import BaselineLSTM, MerityLSTM, MogrifierLSTM, SequenceModelWrapper
 
 from typing import Any
@@ -21,6 +21,10 @@ from typing import Any
 def load_config(config_path: str) -> dict[str, Any]:
     with open(config_path) as config_file:
         return yaml.safe_load(config_file)
+
+def load_lang(lang_path: str) -> Lang:
+    with open(lang_path, "rb") as f:
+        return pickle.load(f)
 
 def get_device() -> torch.device:
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -30,7 +34,7 @@ def seed_everything(seed: int) -> None:
     torch.manual_seed(seed)
     pl.seed_everything(seed)
 
-def get_model(config: dict[str, Any], vocab_size: int) -> nn.Module:
+def get_model_core(config: dict[str, Any], vocab_size: int) -> nn.Module:
     if config["experiment"]["model"] == "baseline":
         return BaselineLSTM(
             num_classes = vocab_size,
@@ -71,25 +75,13 @@ def get_model(config: dict[str, Any], vocab_size: int) -> nn.Module:
     else:
         raise ValueError(f"Provided model '{config['experiment']['model']}' not available.")
     
-
-def get_cost_function(config: dict[str, Any]) -> nn.Module:
-    return nn.CrossEntropyLoss(ignore_index=config["dataset"]["pad_value"])
-
-def train(config: dict[str, Any]):
-    seed_everything(config["experiment"]["seed"])
-    ptb = PennTreebank(
-        download_url = config["dataset"]["ds_url"], 
-        data_dir = config["dataset"]["ds_path"], 
-        batch_size = config["experiment"]["batch_size"],
-    )
-    ptb.prepare_data() 
-    logger = pl.loggers.TensorBoardLogger(
-        config["results"]["logs_path"], 
-        config["experiment"]["experiment_name"]
-    )
-    trainer = pl.Trainer(max_epochs=config["experiment"]["epochs"], logger=logger)
-    model = SequenceModelWrapper(
-        model = get_model(config, ptb.vocab_size),
+def get_model_wrapper(
+        config: dict[str, Any], 
+        vocab_size: int,
+        batch_size: int | None = None) -> SequenceModelWrapper:
+    batch_size = batch_size or config["experiment"]["batch_size"]
+    return SequenceModelWrapper(
+        model = get_model_core(config, vocab_size),
         cost_function = get_cost_function(config),
         optimizer = config["experiment"]["optimizer"],
         learning_rate = float(config["experiment"]["learning_rate"]),
@@ -97,26 +89,44 @@ def train(config: dict[str, Any]):
         asgd_lr = float(config["experiment"].get("asgd_lr", .0)),
         tbptt = bool(config["experiment"].get("tbptt", False)),
         tbptt_config = config["experiment"].get("tbptt_config", None),
-        batch_size = config["experiment"]["batch_size"],
+        batch_size = batch_size,
     )
+    
+def get_data_module(
+        config: dict[str, Any], 
+        batch_size: int | None = None) -> PennTreebank:
+    batch_size = batch_size or config["experiment"]["batch_size"]
+    return PennTreebank(
+        download_url = config["dataset"]["ds_url"],
+        data_dir = config["dataset"]["ds_path"],
+        batch_size = batch_size,
+    )
+
+def get_logger(config: dict[str, Any]) -> pl.loggers.TensorBoardLogger:
+    return pl.loggers.TensorBoardLogger(
+        config["results"]["logs_path"],
+        config["experiment"]["experiment_name"]
+    )
+    
+def get_cost_function(config: dict[str, Any]) -> nn.Module:
+    return nn.CrossEntropyLoss(ignore_index=config["dataset"]["pad_value"])
+
+def train(config: dict[str, Any]):
+    seed_everything(config["experiment"]["seed"])
+    ptb = get_data_module(config)
+    ptb.prepare_data() 
+    logger = get_logger(config)
+    trainer = pl.Trainer(max_epochs=config["experiment"]["epochs"], logger=logger)
+    model = get_model_wrapper(config, ptb.vocab_size)
     trainer.fit(model=model, datamodule=ptb)
 
 def evaluate(config: dict[str, Any], dump_results: bool | None):
-    ptb = PennTreebank(
-        download_url = config["dataset"]["ds_url"], 
-        data_dir = config["dataset"]["ds_path"], 
-        batch_size = 1,
-    )
+    ptb = get_data_module(config, batch_size=1)
     ptb.prepare_data()
     trainer = pl.Trainer(logger=False)
-    model = SequenceModelWrapper.load_model(
-        checkpoint_path = join(*config["experiment"]["checkpoint_path"]),
-        map_location = get_device(),
-        model = get_model(config, ptb.vocab_size),
-        cost_function = get_cost_function(config),
-        batch_size = 1,
-    )
+    model = get_model_wrapper(config, ptb.vocab_size, batch_size=1)
     trainer.test(model=model, datamodule=ptb)
+
     results_path = join(
         *(config["experiment"]["checkpoint_path"])[:-2], 
         f'{config["experiment"]["experiment_name"]}.pkl')
@@ -135,12 +145,11 @@ def inference(
         max_len: int = 30,
         allow_unk: bool = False,
     ):
-    with open(lang_path, "rb") as f:
-        lang = pickle.load(f)
+    lang = load_lang(lang_path)
     model = SequenceModelWrapper.load_model(
         checkpoint_path = join(*config["experiment"]["checkpoint_path"]),
         map_location = get_device(),
-        model = get_model(config, len(lang.words2ids)),
+        model = get_model_core(config, len(lang.words2ids)),
         cost_function = get_cost_function(config),
     )
 
@@ -215,7 +224,7 @@ if __name__ == "__main__":
     elif args.evaluate:
         evaluate(config, args.dump_results)
     elif args.inference:
-        inference_config_path = args.inference_config_path | join("configs", "inference.yaml")
+        inference_config_path = args.inference_config_path or join("configs", "inference.yaml")
         inference_config = load_config(args.inference_config_path)
         inference(
             config, 

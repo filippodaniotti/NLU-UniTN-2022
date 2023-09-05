@@ -1,4 +1,4 @@
 from .lang import Lang
+from .dataset import SentsDataset
 from .collator import get_collator
-from .custom_datasets import SentsDataset
-from .data_module import PennTreebank
+from .datamodule import PennTreebank

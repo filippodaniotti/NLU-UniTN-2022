@@ -83,13 +83,13 @@ class MogrifierLSTM(nn.Module):
         self.lstm = MogLSTMLayer(embedding_dim, hidden_dim, num_layers, mogrify_steps)
         self.fc = nn.Linear(hidden_dim, num_classes)
         self.dropout = nn.Dropout(p_dropout)
-        
+
         if tie_weights:
             self.fc.weight = self.embedding.weight
         
     def forward(self, inputs, lengths, hiddens):
         embedding = self.embedding(inputs)
-        hiddens = hiddens if hiddens else self._init_hiddens(inputs.shape[0], inputs.device)
+        hiddens = hiddens or self._init_hiddens(inputs.shape[0], inputs.device)
 
         outputs = []
         hidden_states = []

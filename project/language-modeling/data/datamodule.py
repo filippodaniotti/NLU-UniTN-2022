@@ -9,7 +9,7 @@ from torch.utils.data.dataloader import DataLoader
 from typing import Union, Any
 
 from .lang import Lang
-from .custom_datasets import SentsDataset
+from .dataset import SentsDataset
 from .collator import get_collator
 
 class PennTreebank(pl.LightningDataModule):
