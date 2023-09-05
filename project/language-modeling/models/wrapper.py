@@ -178,6 +178,11 @@ class SequenceModelWrapper(pl.LightningModule):
         outputs, _ = self(inputs, lengths)
         loss = self.cost_fn(outputs, targets.view(-1))
         return loss, outputs
+        # outputs, _ = self(inputs, lengths)
+        # forward_outputs, backward_outputs = outputs
+        # forward_loss = self.cost_fn(forward_outputs, targets.view(-1))
+        # backward_loss = self.cost_fn(backward_outputs, torch.flip(inputs, dims=(1,)).view(-1))
+        # return (forward_loss + backward_loss) / 2, outputs
     
     def tbptt_forward_wrapper(self, inputs, targets, lengths):
         inputs, targets = self.tbptt_split_batch(inputs, targets)
