@@ -102,7 +102,7 @@ class MerityLSTM(BaselineLSTM):
                     elif 'bias' in name:
                         param.data.fill_(0)
             else:
-                if type(m) in [nn.Embedding]:
+                if type(m) in [nn.Embedding, EmbeddingDropout]:
                     nn.init.uniform_(m.weight, -0.1, 0.1)
                 elif type(m) in [nn.Linear]:
                     if m.bias != None:

@@ -3,7 +3,8 @@ import math
 import pickle
 import numpy as np
 import pandas as pd
-from os.path import join
+from os import listdir, makedirs
+from os.path import join, isfile, isdir
 from argparse import ArgumentParser
 
 
@@ -23,8 +24,8 @@ def load_config(config_path: str) -> dict[str, Any]:
         return yaml.safe_load(config_file)
 
 def load_lang(lang_path: str) -> Lang:
-    with open(lang_path, "rb") as f:
-        return pickle.load(f)
+    with open(lang_path, "rb") as lang_file:
+        return pickle.load(lang_file)
 
 def get_device() -> torch.device:
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -33,6 +34,24 @@ def seed_everything(seed: int) -> None:
     np.random.seed(seed)
     torch.manual_seed(seed)
     pl.seed_everything(seed)
+
+def get_weights_path(config: dict[str, Any]) -> str:
+    if config["experiment"].get("checkpoint_path", None):
+        return join(*config["experiment"]["checkpoint_path"])
+    else:
+        paths = []
+        # check on results_path
+        paths.append(join(config["results"]["results_path"], "weights", f'{config["experiment"]["experiment_name"]}.ckpt'))
+        # check on logs_path
+        tmp = join(config["results"]["logs_path"], config["experiment"]["experiment_name"], "version_0", "checkpoints")
+        tmp_fn = [f for f in listdir(tmp) if f.endswith(".ckpt")][0]
+        paths.append(join(tmp, tmp_fn))
+        for path in paths:
+            if isfile(path):
+                return path
+        else:
+            raise ValueError("No checkpoint found.")
+    
 
 def get_model_core(config: dict[str, Any], vocab_size: int) -> nn.Module:
     if config["experiment"]["model"] == "baseline":
@@ -74,24 +93,32 @@ def get_model_core(config: dict[str, Any], vocab_size: int) -> nn.Module:
         )
     else:
         raise ValueError(f"Provided model '{config['experiment']['model']}' not available.")
-    
+
 def get_model_wrapper(
         config: dict[str, Any], 
         vocab_size: int,
-        batch_size: int | None = None) -> SequenceModelWrapper:
-    batch_size = batch_size or config["experiment"]["batch_size"]
-    return SequenceModelWrapper(
-        model = get_model_core(config, vocab_size),
-        cost_function = get_cost_function(config),
-        optimizer = config["experiment"]["optimizer"],
-        learning_rate = float(config["experiment"]["learning_rate"]),
-        ntasgd = config["experiment"].get("ntasgd", -1),
-        asgd_lr = float(config["experiment"].get("asgd_lr", .0)),
-        tbptt = bool(config["experiment"].get("tbptt", False)),
-        tbptt_config = config["experiment"].get("tbptt_config", None),
-        batch_size = batch_size,
-    )
-    
+        train: bool = True,) -> SequenceModelWrapper:
+    batch_size = config["experiment"]["batch_size"] if train else 1
+    if train:
+        return SequenceModelWrapper(
+            model = get_model_core(config, vocab_size),
+            cost_function = get_cost_function(config),
+            optimizer = config["experiment"]["optimizer"],
+            learning_rate = float(config["experiment"]["learning_rate"]),
+            ntasgd = config["experiment"].get("ntasgd", -1),
+            asgd_lr = float(config["experiment"].get("asgd_lr", .0)),
+            tbptt = bool(config["experiment"].get("tbptt", False)),
+            tbptt_config = config["experiment"].get("tbptt_config", None),
+            batch_size = batch_size,
+        )
+    else:
+        return SequenceModelWrapper.load_model(
+            checkpoint_path = get_weights_path(config),
+            map_location = get_device(),
+            model = get_model_core(config, vocab_size),
+            cost_function = get_cost_function(config),
+        )
+
 def get_data_module(
         config: dict[str, Any], 
         batch_size: int | None = None) -> PennTreebank:
@@ -111,57 +138,48 @@ def get_logger(config: dict[str, Any]) -> pl.loggers.TensorBoardLogger:
 def get_cost_function(config: dict[str, Any]) -> nn.Module:
     return nn.CrossEntropyLoss(ignore_index=config["dataset"]["pad_value"])
 
+
+
 def train(config: dict[str, Any]):
     seed_everything(config["experiment"]["seed"])
     ptb = get_data_module(config)
     ptb.prepare_data() 
     logger = get_logger(config)
     trainer = pl.Trainer(max_epochs=config["experiment"]["epochs"], logger=logger)
-    model = get_model_wrapper(config, ptb.vocab_size)
+    model = get_model_wrapper(config, ptb.vocab_size, train=True)
     trainer.fit(model=model, datamodule=ptb)
 
 def evaluate(config: dict[str, Any], dump_results: bool | None):
     ptb = get_data_module(config, batch_size=1)
     ptb.prepare_data()
     trainer = pl.Trainer(logger=False)
-    model = get_model_wrapper(config, ptb.vocab_size, batch_size=1)
+    model = get_model_wrapper(config, ptb.vocab_size, train=False)
     trainer.test(model=model, datamodule=ptb)
 
-    results_path = join(
-        *(config["experiment"]["checkpoint_path"])[:-2], 
-        f'{config["experiment"]["experiment_name"]}.pkl')
-    df = pd.DataFrame(model.results)
-    loss_mean = df["loss"].mean()
+    loss_mean = pd.DataFrame(model.results)["loss"].mean()
     print(f"Test loss: {loss_mean}")
     print(f"Test pplx: {math.exp(loss_mean)}")
     if dump_results:
+        outputs_path = join(config["results"]["results_path"], "outputs")
+        if not isdir(config["results"]["results_path"]) or not isdir(outputs_path):
+            makedirs(outputs_path)
+        results_path = join(outputs_path, f'{config["experiment"]["experiment_name"]}.pkl')
         SequenceModelWrapper.dump_results(model.results, results_path)
 
-def inference(
-        config: dict[str, Any],
-        prompt: str,
-        mode: str = "argmax",
-        lang_path: str = "lang.pkl",
-        max_len: int = 30,
-        allow_unk: bool = False,
-    ):
-    lang = load_lang(lang_path)
-    model = SequenceModelWrapper.load_model(
-        checkpoint_path = join(*config["experiment"]["checkpoint_path"]),
-        map_location = get_device(),
-        model = get_model_core(config, len(lang.words2ids)),
-        cost_function = get_cost_function(config),
-    )
+def inference(config: dict[str, Any], inf_config: dict[str, Any], prompt: str):
+    lang = load_lang(join(*inf_config["lang_path"]))
+    model = get_model_wrapper(config, len(lang), train=False)
 
     temperatures = [0.5, 0.7, 0.75, 0.8, 1.0]
     for temp in temperatures:
         generated = model.generate(
             prompt, 
             lang, 
-            mode=mode, 
-            max_len=max_len,
-            allow_unk=allow_unk,
-            temperature=temp)
+            mode=inf_config["mode"], 
+            max_len=inf_config["max_length"],
+            allow_unk=inf_config["allow_unk"],
+            temperature=temp,
+            device=get_device())
         print(f"t:{temp} => {generated}")
 
 if __name__ == "__main__":
@@ -221,19 +239,12 @@ if __name__ == "__main__":
     config = load_config(args.config_path)
     if args.train:
         train(config)
-    elif args.evaluate:
+    if args.evaluate:
         evaluate(config, args.dump_results)
-    elif args.inference:
+    if args.inference:
         inference_config_path = args.inference_config_path or join("configs", "inference.yaml")
-        inference_config = load_config(args.inference_config_path)
-        inference(
-            config, 
-            prompt=args.prompt,
-            mode=inference_config["mode"],
-            max_len=inference_config["max_len"],
-            allow_unk=inference_config["allow_unk"],
-            lang_path=inference_config["lang_path"],
-        )
-    else:
+        inference_config = load_config(inference_config_path)
+        inference(config, inference_config, args.prompt)
+    if not any([args.train, args.evaluate, args.inference]):
         raise ValueError("Please provide a supported mode flag ('-t', '-e', '-i')")
     

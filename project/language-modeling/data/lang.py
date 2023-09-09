@@ -12,6 +12,9 @@ class Lang():
         self.words2ids, self.ids2words = self.map_tokens(
             words, pad_value, eos_token, cutoff=cutoff)
         
+    def __len__(self) -> int:
+        return len(self.words2ids)
+        
     def map_tokens(
             self, 
             words: list[str], 

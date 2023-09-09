@@ -119,7 +119,8 @@ class SequenceModelWrapper(pl.LightningModule):
             max_len: int = 30, 
             mode: str = "argmax",
             allow_unk: bool = False,
-            temperature: float = 1.0) -> str:
+            temperature: float = 1.0,
+            device: str = "cpu") -> str:
         
         if mode not in ["multinomial", "argmax"]:
             raise ValueError("Please provide either 'multinomial' or 'argmax' as mode")        
@@ -130,7 +131,7 @@ class SequenceModelWrapper(pl.LightningModule):
         
         prompt = prompt.lower().split(" ")
         text = [lang.words2ids[w] for w in prompt]
-        hidden = self.model._init_hidden(1)
+        hidden = self._init_hidden(1, device)
         pred = ""
 
         while pred != lang.words2ids["<eos>"] and len(text) < max_len:
@@ -231,9 +232,7 @@ class SequenceModelWrapper(pl.LightningModule):
         p = self.tbptt_config["p"]
 
         mu = mu if np.random.random() < p else mu/2
-        split_step = int(np.random.normal(mu, std))
-        # split_step = max(5, split_step)
-        # split_step = min(split_step, 72)
+        split_step = max(10, int(np.random.normal(mu, std)))
 
         return split_step
 
