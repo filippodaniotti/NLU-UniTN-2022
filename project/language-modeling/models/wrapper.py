@@ -26,7 +26,8 @@ class SequenceModelWrapper(pl.LightningModule):
             asgd_lr: float | None = None,
             tbptt: bool = False,
             tbptt_config: dict[str, Any] | None = None,
-            batch_size: int = 128):
+            batch_size: int = 128,
+            evaluate: bool = False,):
         super().__init__()
 
         self.model = model
@@ -52,6 +53,7 @@ class SequenceModelWrapper(pl.LightningModule):
         # disable automatic optimization when using tbptt
         self.automatic_optimization = not tbptt
 
+        self.evaluate = evaluate
         self.results = []
 
     def forward(
@@ -76,18 +78,22 @@ class SequenceModelWrapper(pl.LightningModule):
     
 
     def on_train_epoch_end(self):
-        try: 
+        # try: 
+        validation_loss = self.trainer.callback_metrics.get("Loss/Valid", None)
+        if validation_loss:
             sch = self.lr_schedulers()
-            sch.step(self.trainer.callback_metrics["Loss/Valid"])
-        except KeyError:
-            pass
+            sch.step(validation_loss)
+        # except KeyError:
+        #     pass
 
 
     def validation_step(self, batch: tuple[tensor, tensor], batch_idx: int):
         inputs, targets, lengths = batch
-        loss, _ = self.forward_wrapper(inputs, targets, lengths)
+        loss, outputs = self.forward_wrapper(inputs, targets, lengths)
         self._print_metrics(loss.item(), "Valid")
         self.validation_step_loss.append(loss)
+        if self.evaluate:
+            self._collect_results(inputs, targets, lengths, outputs, loss)
         return loss
     
     def on_validation_epoch_end(self) -> None:
@@ -102,13 +108,8 @@ class SequenceModelWrapper(pl.LightningModule):
         inputs, targets, lengths = batch
         loss, outputs = self.forward_wrapper(inputs, targets, lengths)
         self._print_metrics(loss.item(), "Test")
-        self.results.append({
-            "inputs": inputs.cpu().numpy().squeeze(),
-            "targets": targets.cpu().numpy().squeeze(),
-            "lengths": lengths,
-            "outputs": outputs.cpu().numpy(),
-            "loss": loss.cpu().numpy(),
-        })
+        if self.evaluate:
+            self._collect_results(inputs, targets, lengths, outputs, loss)
         return loss
 
     @torch.no_grad()
@@ -235,6 +236,15 @@ class SequenceModelWrapper(pl.LightningModule):
         metrics = {f"Loss/{stage}": loss, f"Perplexity/{stage}": math.exp(loss)}
         self.log_dict(metrics, prog_bar=True, on_epoch=True, on_step=False, batch_size=self.batch_size)
     
+    def _collect_results(self, inputs, targets, lengths, outputs, loss):
+        self.results.append({
+            "inputs": inputs.cpu().numpy().squeeze(),
+            "targets": targets.cpu().numpy().squeeze(),
+            "lengths": lengths,
+            "outputs": outputs.cpu().numpy(),
+            "loss": loss.cpu().numpy(),
+        })
+    
     def _switch_to_asgd(self):
         self.print(f"Using NT-ASGD at epoch {self.current_epoch}")
         self.ntasgd_trigger = True
@@ -281,6 +291,6 @@ class SequenceModelWrapper(pl.LightningModule):
             for layer in to_rmv:
                 del state_dict[layer]
 
-        wrapper = cls(model, cost_function, batch_size=batch_size)
+        wrapper = cls(model, cost_function, batch_size=batch_size, evaluate=True)
         wrapper.load_state_dict(state_dict)
         return wrapper

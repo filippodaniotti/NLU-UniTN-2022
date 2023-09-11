@@ -110,6 +110,7 @@ def get_model_wrapper(
             tbptt = bool(config["experiment"].get("tbptt", False)),
             tbptt_config = config["experiment"].get("tbptt_config", None),
             batch_size = batch_size,
+            evaluate = not train,
         )
     else:
         return SequenceModelWrapper.load_model(
@@ -154,11 +155,21 @@ def evaluate(config: dict[str, Any], dump_results: bool | None):
     ptb.prepare_data()
     trainer = pl.Trainer(logger=False)
     model = get_model_wrapper(config, ptb.vocab_size, train=False)
-    trainer.test(model=model, datamodule=ptb)
 
-    loss_mean = pd.DataFrame(model.results)["loss"].mean()
-    print(f"Test loss: {loss_mean}")
-    print(f"Test pplx: {math.exp(loss_mean)}")
+    def _run_loop(split: str, split_fn: callable):
+        ptb.setup(split)
+        model.results.clear()
+        split_fn(model=model, datamodule=ptb, verbose=False)
+        loss_mean = float(pd.DataFrame(model.results)["loss"].mean())
+        split = split[0].upper() + split[1:]
+        metrics[split] = [loss_mean, math.exp(loss_mean)]
+
+    metrics = {}
+    _run_loop("valid", trainer.validate)
+    _run_loop("test", trainer.test)
+
+    print(pd.DataFrame(metrics, index=["Loss", "Perplexity"]))
+
     if dump_results:
         outputs_path = join(config["results"]["results_path"], "outputs")
         if not isdir(config["results"]["results_path"]) or not isdir(outputs_path):
