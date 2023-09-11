@@ -3,3 +3,4 @@ allow_unk: True
 max_length: 30
 lang_path: 
   - lang.pkl
+  

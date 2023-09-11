@@ -5,6 +5,7 @@ dataset:
 
 results: 
   logs_path: runs
+  results_path: results
 
 experiment:
   seed: 42

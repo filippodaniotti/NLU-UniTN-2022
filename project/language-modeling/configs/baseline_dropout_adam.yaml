@@ -5,10 +5,11 @@ dataset:
 
 results: 
   logs_path: runs
+  results_path: results
 
 experiment:
   seed: 42
-  experiment_name: baseline
+  experiment_name: baseline_dropout_adam
   epochs: 50
   batch_size: 128
   model: baseline

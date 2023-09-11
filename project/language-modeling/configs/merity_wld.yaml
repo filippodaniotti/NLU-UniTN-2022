@@ -5,13 +5,14 @@ dataset:
 
 results: 
   logs_path: runs
+  results_path: results
 
 experiment:
   seed: 42
-  experiment_name: merity_base
+  experiment_name: merity_wld
   checkpoint_path: 
     - runs
-    - merity_base
+    - merity_wld
     - version_0
     - checkpoints
     - epoch=49-step=16450.ckpt
@@ -24,11 +25,7 @@ experiment:
   asgd_lr: 1
   gradient_clip_val: 0.25
   tbptt: False
-  # tbptt_config:
-  #   mu: 40
-  #   std: 5
-  #   p: .95
-
+  
 model:
   embedding_dim: 400
   hidden_dim: 400

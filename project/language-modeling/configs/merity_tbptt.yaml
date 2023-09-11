@@ -5,13 +5,14 @@ dataset:
 
 results: 
   logs_path: runs
+  results_path: results
 
 experiment:
   seed: 42
-  experiment_name: merity_tbptt
+  experiment_name: merity_ad_tbptt
   checkpoint_path: 
     - runs
-    - merity_tbptt
+    - merity_ad_tbptt
     - version_0
     - checkpoints
     - epoch=49-step=16450.ckpt
@@ -25,7 +26,7 @@ experiment:
   gradient_clip_val: 0.25
   tbptt: True
   tbptt_config:
-    mu: 50
+    mu: 30
     std: 5
     p: .95
 
