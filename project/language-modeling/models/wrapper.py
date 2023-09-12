@@ -54,7 +54,7 @@ class SequenceModelWrapper(pl.LightningModule):
         self.automatic_optimization = not tbptt
 
         self.evaluate = evaluate
-        self.results = []
+        self.outputs = []
 
     def forward(
             self,
@@ -86,6 +86,8 @@ class SequenceModelWrapper(pl.LightningModule):
         # except KeyError:
         #     pass
 
+    def on_validation_start(self) -> None:
+        self.outputs.clear()
 
     def validation_step(self, batch: tuple[tensor, tensor], batch_idx: int):
         inputs, targets, lengths = batch
@@ -93,7 +95,7 @@ class SequenceModelWrapper(pl.LightningModule):
         self._print_metrics(loss.item(), "Valid")
         self.validation_step_loss.append(loss)
         if self.evaluate:
-            self._collect_results(inputs, targets, lengths, outputs, loss)
+            self._collect_outputs(inputs, targets, lengths, outputs, loss)
         return loss
     
     def on_validation_epoch_end(self) -> None:
@@ -103,13 +105,16 @@ class SequenceModelWrapper(pl.LightningModule):
             # if not improving
             if self.validation_epochs_loss[-1] > min(self.validation_epochs_loss[:-self.ntasgd]):
                 self._switch_to_asgd()
+    
+    def on_test_start(self) -> None:
+        self.outputs.clear()
 
     def test_step(self, batch, batch_idx):
         inputs, targets, lengths = batch
         loss, outputs = self.forward_wrapper(inputs, targets, lengths)
         self._print_metrics(loss.item(), "Test")
         if self.evaluate:
-            self._collect_results(inputs, targets, lengths, outputs, loss)
+            self._collect_outputs(inputs, targets, lengths, outputs, loss)
         return loss
 
     @torch.no_grad()
@@ -175,6 +180,24 @@ class SequenceModelWrapper(pl.LightningModule):
                     "interval": "epoch",
                 },
             }
+    
+    def partial_shuffle(self, data):
+        """
+        Method from "Partially Shuffling the Training Data to Improve Language Models" by Ofir Press
+        https://arxiv.org/abs/1903.04167
+        Implementation adapted from https://github.com/ofirpress/PartialShuffle/blob/master/partial_shuffle.py
+        """
+        N = data.shape[0]  # batch size
+        M = data.shape[1]  # length of each batch element (or equivalently, row)
+
+        splits = torch.from_numpy(np.random.randint(M, size=N))
+        shifted = []
+        for i, row in enumerate(data):
+            shifted.append(
+                torch.cat((row[splits[i]:], row[:splits[i]])) #partial shuffle of a single row
+            )
+        # print('The training data has been partially shuffled!')
+        return torch.stack(shifted)
 
     def forward_wrapper(self, inputs, targets, lengths):
         outputs, _ = self(inputs, lengths)
@@ -236,8 +259,8 @@ class SequenceModelWrapper(pl.LightningModule):
         metrics = {f"Loss/{stage}": loss, f"Perplexity/{stage}": math.exp(loss)}
         self.log_dict(metrics, prog_bar=True, on_epoch=True, on_step=False, batch_size=self.batch_size)
     
-    def _collect_results(self, inputs, targets, lengths, outputs, loss):
-        self.results.append({
+    def _collect_outputs(self, inputs, targets, lengths, outputs, loss):
+        self.outputs.append({
             "inputs": inputs.cpu().numpy().squeeze(),
             "targets": targets.cpu().numpy().squeeze(),
             "lengths": lengths,

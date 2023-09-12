@@ -150,7 +150,7 @@ def train(config: dict[str, Any]):
     model = get_model_wrapper(config, ptb.vocab_size, train=True)
     trainer.fit(model=model, datamodule=ptb)
 
-def evaluate(config: dict[str, Any], dump_results: bool | None):
+def evaluate(config: dict[str, Any], dump_outputs: bool | None):
     ptb = get_data_module(config, batch_size=1)
     ptb.prepare_data()
     trainer = pl.Trainer(logger=False)
@@ -158,9 +158,8 @@ def evaluate(config: dict[str, Any], dump_results: bool | None):
 
     def _run_loop(split: str, split_fn: callable):
         ptb.setup(split)
-        model.results.clear()
         split_fn(model=model, datamodule=ptb, verbose=False)
-        loss_mean = float(pd.DataFrame(model.results)["loss"].mean())
+        loss_mean = float(pd.DataFrame(model.outputs)["loss"].mean())
         split = split[0].upper() + split[1:]
         metrics[split] = [loss_mean, math.exp(loss_mean)]
 
@@ -168,14 +167,14 @@ def evaluate(config: dict[str, Any], dump_results: bool | None):
     _run_loop("valid", trainer.validate)
     _run_loop("test", trainer.test)
 
-    print(pd.DataFrame(metrics, index=["Loss", "Perplexity"]))
-
-    if dump_results:
+    if dump_outputs:
         outputs_path = join(config["results"]["results_path"], "outputs")
         if not isdir(config["results"]["results_path"]) or not isdir(outputs_path):
             makedirs(outputs_path)
         results_path = join(outputs_path, f'{config["experiment"]["experiment_name"]}.pkl')
-        SequenceModelWrapper.dump_results(model.results, results_path)
+        SequenceModelWrapper.dump_outputs(model.outputs, results_path)
+
+    return pd.DataFrame(metrics, index=["Loss", "Perplexity"])
 
 def inference(config: dict[str, Any], inf_config: dict[str, Any], prompt: str):
     lang = load_lang(join(*inf_config["lang_path"]))
@@ -220,8 +219,8 @@ if __name__ == "__main__":
         "-d", 
         "--dump-results", 
         action="store_true", 
-        dest="dump_results", 
-        help="Flag for dumping results object after test run"
+        dest="dump_outputs", 
+        help="Flag for dumping test outputs object after test run"
     )
     parser.add_argument(
         "-i", 
@@ -251,7 +250,8 @@ if __name__ == "__main__":
     if args.train:
         train(config)
     if args.evaluate:
-        evaluate(config, args.dump_results)
+        metrics = evaluate(config, args.dump_outputs)
+        print(metrics)
     if args.inference:
         inference_config_path = args.inference_config_path or join("configs", "inference.yaml")
         inference_config = load_config(inference_config_path)
