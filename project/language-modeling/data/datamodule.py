@@ -60,8 +60,7 @@ class PennTreebank(pl.LightningDataModule):
     def setup(self, stage: str):
         if stage == "fit":
             self.ptb_train = SentsDataset(self.dataset["train"]["text"], self.lang.words2ids)
-            self.ptb_val = SentsDataset(self.dataset["valid"]["text"], self.lang.words2ids)
-        if stage == "valid":
+        if stage == "fit" or stage == "valid":
             self.ptb_val = SentsDataset(self.dataset["valid"]["text"], self.lang.words2ids)
         if stage == "test":
             self.ptb_test = SentsDataset(self.dataset["test"]["text"], self.lang.words2ids)

@@ -1,8 +1,8 @@
 import sys
-sys.path.append(".")
+sys.path.insert(0, ".")
 import pickle
 from argparse import ArgumentParser
-from data.data_module import PennTreebank
+from data import PennTreebank
 
 def main(filename: str) -> None:
     ptb = PennTreebank("https://data.deepai.org/ptbdataset.zip", "penn_treebank")
@@ -11,13 +11,14 @@ def main(filename: str) -> None:
         pickle.dump(ptb.lang, f)
 
 if __name__ == "__main__":
-    parser = ArgumentParser(description="Base interface")
+    parser = ArgumentParser(description="Utility for dumping the Lang object")
     parser.add_argument(
         "-f", 
         "--filename", 
         type=str, 
         dest="filename", 
-        help="Path to save the lang object"
+        default="lang.pkl",
+        help="Path to save the lang object. Defaults to 'lang.pkl'"
     )
 
     args = parser.parse_args()

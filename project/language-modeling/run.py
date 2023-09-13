@@ -94,7 +94,7 @@ def get_model_core(config: dict[str, Any], vocab_size: int) -> nn.Module:
     else:
         raise ValueError(f"Provided model '{config['experiment']['model']}' not available.")
 
-def get_model_wrapper(
+def get_model(
         config: dict[str, Any], 
         vocab_size: int,
         train: bool = True,) -> SequenceModelWrapper:
@@ -147,14 +147,14 @@ def train(config: dict[str, Any]):
     ptb.prepare_data() 
     logger = get_logger(config)
     trainer = pl.Trainer(max_epochs=config["experiment"]["epochs"], logger=logger)
-    model = get_model_wrapper(config, ptb.vocab_size, train=True)
+    model = get_model(config, ptb.vocab_size, train=True)
     trainer.fit(model=model, datamodule=ptb)
 
 def evaluate(config: dict[str, Any], dump_outputs: bool | None):
     ptb = get_data_module(config, batch_size=1)
     ptb.prepare_data()
     trainer = pl.Trainer(logger=False)
-    model = get_model_wrapper(config, ptb.vocab_size, train=False)
+    model = get_model(config, ptb.vocab_size, train=False)
 
     def _run_loop(split: str, split_fn: callable):
         ptb.setup(split)
@@ -178,7 +178,7 @@ def evaluate(config: dict[str, Any], dump_outputs: bool | None):
 
 def inference(config: dict[str, Any], inf_config: dict[str, Any], prompt: str):
     lang = load_lang(join(*inf_config["lang_path"]))
-    model = get_model_wrapper(config, len(lang), train=False)
+    model = get_model(config, len(lang), train=False)
 
     temperatures = [0.5, 0.7, 0.75, 0.8, 1.0]
     for temp in temperatures:
@@ -193,7 +193,7 @@ def inference(config: dict[str, Any], inf_config: dict[str, Any], prompt: str):
         print(f"t:{temp} => {generated}")
 
 if __name__ == "__main__":
-    parser = ArgumentParser(description="Base interface")
+    parser = ArgumentParser(description="Base interface for training, evaluation and inference")
     parser.add_argument(
         "-c", 
         "--config", 
@@ -234,7 +234,8 @@ if __name__ == "__main__":
         "--inference-config", 
         type=str, 
         dest="inference_config_path", 
-        help="Path of inference configuration file"
+        default=join("configs", "inference.yaml"),
+        help="Path of inference configuration file. Defaults to 'configs/inference.yaml''"
     )
     parser.add_argument(
         "-p",
@@ -253,8 +254,7 @@ if __name__ == "__main__":
         metrics = evaluate(config, args.dump_outputs)
         print(metrics)
     if args.inference:
-        inference_config_path = args.inference_config_path or join("configs", "inference.yaml")
-        inference_config = load_config(inference_config_path)
+        inference_config = load_config(args.inference_config_path)
         inference(config, inference_config, args.prompt)
     if not any([args.train, args.evaluate, args.inference]):
         raise ValueError("Please provide a supported mode flag ('-t', '-e', '-i')")

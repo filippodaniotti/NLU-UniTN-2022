@@ -2,6 +2,6 @@ penn_treebank/
 lightning_logs/
 *.zip
 runs*/
-results/
+results*/
 tmp/
 *.pkl

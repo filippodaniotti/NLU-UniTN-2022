@@ -9,7 +9,7 @@ import os
 import pprint
 import traceback
 
-import click
+# import click
 import pandas as pd
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
@@ -59,7 +59,7 @@ def many_logs2pandas(event_paths):
             if all_logs.shape[0] == 0:
                 all_logs = log
             else:
-                all_logs = all_logs.append(log, ignore_index=True)
+                all_logs = all_logs._append(log, ignore_index=True)
     return all_logs
 
 
