@@ -10,12 +10,6 @@ results:
 experiment:
   seed: 42
   experiment_name: merity_base
-  checkpoint_path: 
-    - runs
-    - merity_base
-    - version_0
-    - checkpoints
-    - epoch=49-step=16450.ckpt
   epochs: 50
   batch_size: 128
   model: merity
@@ -29,7 +23,7 @@ experiment:
 model:
   embedding_dim: 400
   hidden_dim: 400
-  num_layers: 3
+  num_layers: 2
   locked_dropout: False
   p_lockdrop: .4
   embedding_dropout: False

@@ -10,12 +10,6 @@ results:
 experiment:
   seed: 42
   experiment_name: merity_ed
-  checkpoint_path: 
-    - runs
-    - merity_ed
-    - version_0
-    - checkpoints
-    - epoch=49-step=16450.ckpt
   epochs: 50
   batch_size: 128
   model: merity

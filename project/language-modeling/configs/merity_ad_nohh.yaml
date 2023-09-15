@@ -9,13 +9,7 @@ results:
 
 experiment:
   seed: 42
-  experiment_name: merity_base
-  checkpoint_path: 
-    - runs
-    - merity_base
-    - version_0
-    - checkpoints
-    - epoch=49-step=16450.ckpt
+  experiment_name: merity_ad_nohh
   epochs: 50
   batch_size: 128
   model: merity
@@ -25,10 +19,6 @@ experiment:
   asgd_lr: 1
   gradient_clip_val: 0.25
   tbptt: False
-  # tbptt_config:
-  #   mu: 40
-  #   std: 5
-  #   p: .95
 
 model:
   embedding_dim: 400
