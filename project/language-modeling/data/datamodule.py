@@ -10,7 +10,7 @@ from typing import Union, Any
 
 from .lang import Lang
 from .dataset import SentsDataset
-from .collator import get_collator
+from .collator import get_collator, SequenceCollator
 
 class PennTreebank(pl.LightningDataModule):
     def __init__(self,
@@ -18,13 +18,17 @@ class PennTreebank(pl.LightningDataModule):
             data_dir: str,
             temp_zip_name = "ptb.zip",
             batch_size: int = 64,
-            p_reverse: float = None):
+            tbptt: bool = False,
+            tbptt_config: dict[str, Any] | None = None,
+            pad_value: int = 0,):
         super().__init__()
         self.download_url = download_url
         self.data_dir = data_dir
         self.temp_zip_name = temp_zip_name
         self.batch_size = batch_size
-        self.p_reverse = p_reverse
+        self.pad_value = pad_value
+        self.tbptt = tbptt
+        self.tbptt_config = tbptt_config
 
         # placeholders
         self.vocab_size: int = -1
@@ -54,7 +58,7 @@ class PennTreebank(pl.LightningDataModule):
             "train": "ptb.train.txt",
             "test":"ptb.test.txt",
             "valid": "ptb.valid.txt"})
-        self.lang = Lang(self.dataset["train"]["text"], parse_sents=True)
+        self.lang = Lang(self.dataset["train"]["text"], pad_value=self.pad_value, parse_sents=True)
         self.vocab_size = len(self.lang.words2ids)
 
     def setup(self, stage: str):
@@ -70,8 +74,10 @@ class PennTreebank(pl.LightningDataModule):
             self.ptb_train,
             batch_size=self.batch_size,
             shuffle=True,
-            collate_fn=get_collator(
-                p_reverse=self.p_reverse),
+            collate_fn=SequenceCollator(
+                pad_value = self.pad_value,
+                tbptt = self.tbptt,
+                tbptt_config = self.tbptt_config),
             num_workers=4)
 
 
@@ -80,7 +86,7 @@ class PennTreebank(pl.LightningDataModule):
             self.ptb_val,
             batch_size=self.batch_size,
             shuffle=False,
-            collate_fn=get_collator(),
+            collate_fn=SequenceCollator(),
             num_workers=4)
 
     def test_dataloader(self):
@@ -88,8 +94,5 @@ class PennTreebank(pl.LightningDataModule):
             self.ptb_test,
             batch_size=self.batch_size,
             shuffle=False,
-            collate_fn=get_collator(),
+            collate_fn=SequenceCollator(),
             num_workers=4)
-
-    def set_reverse(self, reverse: Union[float, None]) -> None:
-        self.p_reverse = reverse

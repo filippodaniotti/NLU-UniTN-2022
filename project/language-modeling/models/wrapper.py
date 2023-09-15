@@ -25,7 +25,6 @@ class SequenceModelWrapper(pl.LightningModule):
             ntasgd: int = -1,
             asgd_lr: float | None = None,
             tbptt: bool = False,
-            tbptt_config: dict[str, Any] | None = None,
             batch_size: int = 128,
             evaluate: bool = False,):
         super().__init__()
@@ -49,7 +48,6 @@ class SequenceModelWrapper(pl.LightningModule):
         self.validation_epochs_loss = []
 
         self.tbptt = tbptt
-        self.tbptt_config = tbptt_config
         # disable automatic optimization when using tbptt
         self.automatic_optimization = not tbptt
 
@@ -180,24 +178,6 @@ class SequenceModelWrapper(pl.LightningModule):
                     "interval": "epoch",
                 },
             }
-    
-    def partial_shuffle(self, data):
-        """
-        Method from "Partially Shuffling the Training Data to Improve Language Models" by Ofir Press
-        https://arxiv.org/abs/1903.04167
-        Implementation adapted from https://github.com/ofirpress/PartialShuffle/blob/master/partial_shuffle.py
-        """
-        N = data.shape[0]  # batch size
-        M = data.shape[1]  # length of each batch element (or equivalently, row)
-
-        splits = torch.from_numpy(np.random.randint(M, size=N))
-        shifted = []
-        for i, row in enumerate(data):
-            shifted.append(
-                torch.cat((row[splits[i]:], row[:splits[i]])) #partial shuffle of a single row
-            )
-        # print('The training data has been partially shuffled!')
-        return torch.stack(shifted)
 
     def forward_wrapper(self, inputs, targets, lengths):
         outputs, _ = self(inputs, lengths)
@@ -205,7 +185,6 @@ class SequenceModelWrapper(pl.LightningModule):
         return loss, outputs
     
     def tbptt_forward_wrapper(self, inputs, targets, lengths):
-        inputs, targets = self.tbptt_split_batch(inputs, targets)
         hiddens = self._init_hidden(inputs[0].shape[0], inputs[0].device)
 
         batch_loss = .0
@@ -226,34 +205,6 @@ class SequenceModelWrapper(pl.LightningModule):
         batch_loss /= (split_idx + 1)
         batch_loss = torch.tensor(batch_loss, device=inputs[0].device)
         return batch_loss, None
-    
-    def tbptt_split_batch(self, inputs, targets):
-        split_step = self.get_split_step()
-        inputs = list(torch.split(inputs, split_step, dim=1))
-        targets = list(torch.split(targets, split_step, dim=1))
-
-        # pad last batch
-        if inputs[-1].shape[1] < split_step:
-            inputs[-1] = F.pad(inputs[-1], (0, split_step - inputs[-1].shape[1]))
-            targets[-1] = F.pad(targets[-1], (0, split_step - inputs[-1].shape[1]))
-
-        # remove empty sentences and batches
-        get_length = lambda x: torch.sum(x.ne(self.pad_value)).item()
-        for split_idx in range(len(inputs)):
-            inputs[split_idx] = torch.stack([i for i in inputs[split_idx] if get_length(i) > 0])
-            targets[split_idx] = torch.stack([t for t in targets[split_idx] if get_length(t) > 0])
-
-        return inputs, targets
-    
-    def get_split_step(self):
-        mu = self.tbptt_config["mu"]
-        std = self.tbptt_config["std"]
-        p = self.tbptt_config["p"]
-
-        mu = mu if np.random.random() < p else mu/2
-        split_step = max(10, int(np.random.normal(mu, std)))
-
-        return split_step
 
     def _print_metrics(self, loss: float, stage: str) -> None:
         metrics = {f"Loss/{stage}": loss, f"Perplexity/{stage}": math.exp(loss)}
@@ -261,8 +212,8 @@ class SequenceModelWrapper(pl.LightningModule):
     
     def _collect_outputs(self, inputs, targets, lengths, outputs, loss):
         self.outputs.append({
-            "inputs": inputs.cpu().numpy().squeeze(),
-            "targets": targets.cpu().numpy().squeeze(),
+            "inputs": inputs.cpu().numpy(),
+            "targets": targets.cpu().numpy(),
             "lengths": lengths,
             "outputs": outputs.cpu().numpy(),
             "loss": loss.cpu().numpy(),
@@ -303,7 +254,7 @@ class SequenceModelWrapper(pl.LightningModule):
             cost_function: nn.Module,
             batch_size: int = 1,
         ) -> "SequenceModelWrapper":
-
+    
         state_dict = torch.load(checkpoint_path, map_location=map_location)["state_dict"]
 
         if isinstance(model, MerityLSTM):
@@ -316,4 +267,6 @@ class SequenceModelWrapper(pl.LightningModule):
 
         wrapper = cls(model, cost_function, batch_size=batch_size, evaluate=True)
         wrapper.load_state_dict(state_dict)
+        wrapper.eval()
+        wrapper.freeze()
         return wrapper

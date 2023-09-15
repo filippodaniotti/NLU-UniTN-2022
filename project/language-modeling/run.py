@@ -1,3 +1,4 @@
+import sys
 import yaml
 import math
 import pickle
@@ -108,7 +109,6 @@ def get_model(
             ntasgd = config["experiment"].get("ntasgd", -1),
             asgd_lr = float(config["experiment"].get("asgd_lr", .0)),
             tbptt = bool(config["experiment"].get("tbptt", False)),
-            tbptt_config = config["experiment"].get("tbptt_config", None),
             batch_size = batch_size,
             evaluate = not train,
         )
@@ -127,6 +127,9 @@ def get_data_module(
     return PennTreebank(
         download_url = config["dataset"]["ds_url"],
         data_dir = config["dataset"]["ds_path"],
+        pad_value = config["dataset"]["pad_value"],
+        tbptt = bool(config["experiment"].get("tbptt", False)),
+        tbptt_config = config["experiment"].get("tbptt_config", None),
         batch_size = batch_size,
     )
 
