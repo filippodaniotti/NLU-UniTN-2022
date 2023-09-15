@@ -2,6 +2,7 @@ import sys
 import yaml
 import math
 import pickle
+import logging
 import numpy as np
 import pandas as pd
 from os import listdir, makedirs
@@ -154,9 +155,11 @@ def train(config: dict[str, Any]):
     trainer.fit(model=model, datamodule=ptb)
 
 def evaluate(config: dict[str, Any], dump_outputs: bool | None):
+    # disable device information logging
+    logging.getLogger("pytorch_lightning").setLevel(logging.ERROR)
     ptb = get_data_module(config, batch_size=1)
     ptb.prepare_data()
-    trainer = pl.Trainer(logger=False)
+    trainer = pl.Trainer(logger=False, enable_model_summary=False)
     model = get_model(config, ptb.vocab_size, train=False)
 
     def _run_loop(split: str, split_fn: callable):

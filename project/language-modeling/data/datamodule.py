@@ -10,7 +10,7 @@ from typing import Union, Any
 
 from .lang import Lang
 from .dataset import SentsDataset
-from .collator import get_collator, SequenceCollator
+from .collator import SequenceCollator
 
 class PennTreebank(pl.LightningDataModule):
     def __init__(self,
