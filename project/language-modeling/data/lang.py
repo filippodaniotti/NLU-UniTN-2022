@@ -17,9 +17,9 @@ class Lang():
     
     def __getitem__(self, key: str | int) -> str | int:
         if isinstance(key, str):
-            return self.words2ids[key]
+            return self.words2ids[key] if key in self.words2ids else self['<unk>']
         elif isinstance(key, int):
-            return self.ids2words[key]
+            return self.ids2words[key] if key in self.ids2words else '<unk>'
         else:
             raise TypeError("Key must be either str or int")
         

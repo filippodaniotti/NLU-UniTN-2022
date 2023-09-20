@@ -134,7 +134,7 @@ class SequenceModelWrapper(pl.LightningModule):
                         else torch.multinomial(o, num_samples=1)
         
         prompt = prompt.lower().split(" ")
-        text = [lang[w] if w in lang.words2ids else lang["<unk>"] for w in prompt]        
+        text = [lang[w] for w in prompt]
         hidden = self._init_hidden(1, device)
         pred = ""
 

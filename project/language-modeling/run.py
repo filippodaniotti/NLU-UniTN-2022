@@ -272,9 +272,12 @@ if __name__ == "__main__":
         if not args.interactive:
             inference(config, inference_config, args.prompt)
         else:
-            while True:
-                prompt = input("Please provide a prompt: ")
-                inference(config, inference_config, prompt)
+            try:
+                while True:
+                    prompt = input("Please provide a prompt: ")
+                    inference(config, inference_config, prompt)
+            except KeyboardInterrupt:
+                print("Exiting...")
     if not any([args.train, args.evaluate, args.inference]):
         raise ValueError("Please provide a supported mode flag ('-t', '-e', '-i')")
     
