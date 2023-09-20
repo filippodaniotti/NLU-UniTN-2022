@@ -134,7 +134,13 @@ class SequenceModelWrapper(pl.LightningModule):
                         else torch.multinomial(o, num_samples=1)
         
         prompt = prompt.lower().split(" ")
-        text = [lang.words2ids[w] for w in prompt]
+
+        try:
+            text = [lang.words2ids[w] for w in prompt]
+        except KeyError:
+            print(f"Prompt '{prompt}' contains words not in the vocabulary, aborting.")
+            return ""
+        
         hidden = self._init_hidden(1, device)
         pred = ""
 
@@ -152,7 +158,7 @@ class SequenceModelWrapper(pl.LightningModule):
             
             text.append(pred)
 
-        return " ".join([lang.ids2words[w] for w in text])
+        return " ".join([lang.ids2words[w] for w in text[:-1]])
 
 
     def configure_optimizers(self):
@@ -212,10 +218,10 @@ class SequenceModelWrapper(pl.LightningModule):
     
     def _collect_outputs(self, inputs, targets, lengths, outputs, loss):
         self.outputs.append({
-            "inputs": inputs.cpu().numpy(),
-            "targets": targets.cpu().numpy(),
+            "inputs": inputs.cpu().numpy().squeeze(),
+            "targets": targets.cpu().numpy().squeeze(),
             "lengths": lengths,
-            "outputs": outputs.cpu().numpy(),
+            "outputs": outputs.cpu().numpy().squeeze(),
             "loss": loss.cpu().numpy(),
         })
     
@@ -241,9 +247,9 @@ class SequenceModelWrapper(pl.LightningModule):
         return hiddens, cells
 
     @classmethod
-    def dump_results(cls, results: dict[str, Any], filename: str):
+    def dump_outputs(cls, outputs: dict[str, Any], filename: str):
         with open(filename, "wb") as f:
-            pickle.dump(results, f)
+            pickle.dump(outputs, f)
     
     @classmethod
     def load_model(

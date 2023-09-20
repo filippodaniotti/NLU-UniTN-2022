@@ -170,7 +170,8 @@ def evaluate(config: dict[str, Any], dump_outputs: bool | None):
         metrics[split] = [loss_mean, math.exp(loss_mean)]
 
     metrics = {}
-    _run_loop("valid", trainer.validate)
+    if not dump_outputs: 
+        _run_loop("valid", trainer.validate)
     _run_loop("test", trainer.test)
 
     if dump_outputs:
@@ -244,6 +245,13 @@ if __name__ == "__main__":
         help="Path of inference configuration file. Defaults to 'configs/inference.yaml''"
     )
     parser.add_argument(
+        "-it", 
+        "--interactive", 
+        action="store_true", 
+        default=False,
+        help="Flag for interactive inference mode"
+    )
+    parser.add_argument(
         "-p",
         "--prompt",
         type=str,
@@ -261,7 +269,12 @@ if __name__ == "__main__":
         print(metrics)
     if args.inference:
         inference_config = load_config(args.inference_config_path)
-        inference(config, inference_config, args.prompt)
+        if not args.interactive:
+            inference(config, inference_config, args.prompt)
+        else:
+            while True:
+                prompt = input("Please provide a prompt: ")
+                inference(config, inference_config, prompt)
     if not any([args.train, args.evaluate, args.inference]):
         raise ValueError("Please provide a supported mode flag ('-t', '-e', '-i')")
     
