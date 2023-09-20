@@ -14,6 +14,14 @@ class Lang():
         
     def __len__(self) -> int:
         return len(self.words2ids)
+    
+    def __getitem__(self, key: str | int) -> str | int:
+        if isinstance(key, str):
+            return self.words2ids[key]
+        elif isinstance(key, int):
+            return self.ids2words[key]
+        else:
+            raise TypeError("Key must be either str or int")
         
     def map_tokens(
             self, 

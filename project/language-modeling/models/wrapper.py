@@ -134,17 +134,11 @@ class SequenceModelWrapper(pl.LightningModule):
                         else torch.multinomial(o, num_samples=1)
         
         prompt = prompt.lower().split(" ")
-
-        try:
-            text = [lang.words2ids[w] for w in prompt]
-        except KeyError:
-            print(f"Prompt '{prompt}' contains words not in the vocabulary, aborting.")
-            return ""
-        
+        text = [lang[w] if w in lang.words2ids else lang["<unk>"] for w in prompt]        
         hidden = self._init_hidden(1, device)
         pred = ""
 
-        while pred != lang.words2ids["<eos>"] and len(text) < max_len:
+        while pred != lang["<eos>"] and len(text) < max_len:
             inp = torch.tensor(text).unsqueeze(0)
             length = np.asarray([len(text)], dtype=np.int32)
             output, hidden = self(inp, length, hidden)
@@ -153,12 +147,12 @@ class SequenceModelWrapper(pl.LightningModule):
             pred = get_pred(softmax, mode).item()
 
             if not allow_unk:
-                while pred == lang.words2ids["<unk>"]:
+                while pred == lang["<unk>"]:
                     pred = get_pred(softmax, "multinomial").item()
             
             text.append(pred)
 
-        return " ".join([lang.ids2words[w] for w in text[:-1]])
+        return " ".join([lang[w] for w in text[:-1]])
 
 
     def configure_optimizers(self):

@@ -59,15 +59,15 @@ class PennTreebank(pl.LightningDataModule):
             "test":"ptb.test.txt",
             "valid": "ptb.valid.txt"})
         self.lang = Lang(self.dataset["train"]["text"], pad_value=self.pad_value, parse_sents=True)
-        self.vocab_size = len(self.lang.words2ids)
+        self.vocab_size = len(self.lang)
 
     def setup(self, stage: str):
         if stage == "fit":
-            self.ptb_train = SentsDataset(self.dataset["train"]["text"], self.lang.words2ids)
+            self.ptb_train = SentsDataset(self.dataset["train"]["text"], self.lang)
         if stage == "fit" or stage == "valid":
-            self.ptb_val = SentsDataset(self.dataset["valid"]["text"], self.lang.words2ids)
+            self.ptb_val = SentsDataset(self.dataset["valid"]["text"], self.lang)
         if stage == "test":
-            self.ptb_test = SentsDataset(self.dataset["test"]["text"], self.lang.words2ids)
+            self.ptb_test = SentsDataset(self.dataset["test"]["text"], self.lang)
 
     def train_dataloader(self):
         return DataLoader(
