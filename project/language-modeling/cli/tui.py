@@ -10,15 +10,32 @@ from typing import Any
 
 APP_NAME = "Language Modeling with LSTMs TUI"
 APP_VERSION = "v1.0"
-AUTHOR = "Filippo Daniotti"
 REPO = "https://github.com/filippodaniotti/NLU-UniTN-2022"
+INSTRUCTIONS = [
+    "How to use:",
+    "* Type a prompt to generate a text.",
+    "* Hit <Enter> to flush the input buffer.",
+    "* Hit <Backspace> to delete the character left to the cursor.",
+    "* Type 't=' followed by a temperature value to set the temperature.",
+    "* Type 'quit' and press <Enter> to exit the application.",
+]
 
-DELAY = 2
+INFO_Y_OFFSET = 7
+INSTRUCTIONS_X_OFFSET = 30
+SERVICE_WINDOW_Y_OFFSET = 7
+INPUT_WINDOW_Y_OFFSET = 5
+OUTPUT_WINDOW_Y_OFFSET = 3
 
+DELAY = 4
 
-def display_centered_text(stdscr, text, y_offset=0, attr=curses.A_NORMAL):
+def display_text(stdscr, text, y_offset=0, attr=curses.A_NORMAL, left=False):
     height, width = stdscr.getmaxyx()
-    stdscr.addstr(height // 2 + y_offset, (width - len(text)) // 2, text, attr)
+    y = height // 2 + y_offset
+    # centered by default
+    x = (width - len(text)) // 2
+    if left:
+        x = (width // 2) - INSTRUCTIONS_X_OFFSET
+    stdscr.addstr(y, x, text, attr)
     stdscr.refresh()
 
 def display_in_subwin(window, text, cursor_x = None, attr=curses.A_NORMAL):
@@ -29,6 +46,7 @@ def display_in_subwin(window, text, cursor_x = None, attr=curses.A_NORMAL):
     window.refresh()
 
 def handle_input(key, buffer, output, counter, cursor_position, iw, temp):
+    is_printable = False
     exit_requested = False
 
     # Enter
@@ -36,7 +54,7 @@ def handle_input(key, buffer, output, counter, cursor_position, iw, temp):
         if "quit" in buffer.lower():
             exit_requested = True
         if "t=" in buffer.lower():
-            value = buffer.split("=")[1]
+            value = buffer.split("=")[1].strip()
             try:
                 temp = float(value)
             except ValueError:
@@ -68,11 +86,12 @@ def handle_input(key, buffer, output, counter, cursor_position, iw, temp):
 
     # printable characters
     elif key >= 32 and key <= 126:
+        is_printable = True
         buffer = buffer[:cursor_position] + chr(key) + buffer[cursor_position:]
         cursor_position += 1
         counter += 1
 
-    return buffer, output, counter, cursor_position, exit_requested, temp
+    return buffer, output, counter, cursor_position, exit_requested, is_printable, temp
 
 
 def main(config: dict[str, Any], inf_config: dict[str, Any]) -> callable:
@@ -87,20 +106,21 @@ def main(config: dict[str, Any], inf_config: dict[str, Any]) -> callable:
         stdscr.clear()      
         stdscr.refresh()    
 
-        display_centered_text(stdscr, f"{APP_NAME}, {APP_VERSION}", -3, curses.A_BOLD)
-        # display_centered_text(stdscr, f"Created by {AUTHOR}", -1)
-        display_centered_text(stdscr, f"{REPO}", -1, curses.A_UNDERLINE)
+        display_text(stdscr, f"{APP_NAME}, {APP_VERSION}", -INFO_Y_OFFSET, curses.A_BOLD)
+        display_text(stdscr, f"{REPO}", -INFO_Y_OFFSET+2, curses.A_UNDERLINE)
+        for idx, line in enumerate(INSTRUCTIONS):
+            display_text(stdscr, line, -INFO_Y_OFFSET+4+idx, left=True)
 
         # Input window
-        input_window = curses.newwin(1, curses.COLS - 2, curses.LINES - 5, 1)
+        input_window = curses.newwin(1, curses.COLS - 2, curses.LINES - INPUT_WINDOW_Y_OFFSET, 1)
         input_window.border()  # Draw a border around the input window
         input_window.refresh()
 
         # Temperature window
-        temp_window = curses.newwin(1, curses.COLS - 2, curses.LINES - 7, 1)
+        service_window = curses.newwin(1, curses.COLS - 2, curses.LINES - SERVICE_WINDOW_Y_OFFSET, 1)
 
         # Output window
-        output_window = curses.newwin(2, curses.COLS - 2, curses.LINES - 3, 1)
+        output_window = curses.newwin(2, curses.COLS - 2, curses.LINES - OUTPUT_WINDOW_Y_OFFSET, 1)
 
         counter = 0
         buffer = ""
@@ -118,23 +138,23 @@ def main(config: dict[str, Any], inf_config: dict[str, Any]) -> callable:
 
         while True:
             key = input_window.getch()
-            buffer, output[0], counter, cursor_position, exit_requested, temp = handle_input(
+            buffer, output[0], counter, cursor_position, exit_requested, is_printable, temp = handle_input(
                 key, buffer, output[0], counter, cursor_position, input_window, temp)
             if exit_requested:
                 for i in range(3, 0, -1):
-                    display_in_subwin(output_window, f"Application is quittingin {i}...")
+                    display_in_subwin(service_window, f"Bye! Application is quitting in {i}...", 0, curses.A_STANDOUT)
                     time.sleep(1)
                 break
             
-            if len(buffer) > 0 and (counter % DELAY == 0 or buffer[-1] == " "):
+            if len(buffer) > 0 and is_printable and (counter % DELAY == 0 or buffer[-1] == " "):
                 th = Thread(target=inference_wrapper, args=(buffer, temp, output))
                 th.start()
-                counter = DELAY
+                counter = DELAY + 1 
             elif counter < DELAY:
                 output[0] = buffer
             
             display_in_subwin(output_window, output[0], attr=curses.A_ITALIC)
-            display_in_subwin(temp_window, f"T: {temp:.2f}")
+            display_in_subwin(service_window, f"T: {temp:.2f}")
             display_in_subwin(input_window, buffer, cursor_position)
 
     return _main
