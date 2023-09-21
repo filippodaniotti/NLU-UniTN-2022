@@ -1,27 +1,72 @@
-import sys
-import yaml
-import math
-import pickle
-import logging
-import numpy as np
-import pandas as pd
-from os import listdir, makedirs
-from os.path import join, isfile, isdir
+from os.path import join
 from argparse import ArgumentParser
 
+from torch.multiprocessing import set_sharing_strategy
+set_sharing_strategy('file_system')
 
-import torch
-import torch.nn as nn
-import pytorch_lightning as pl
-import torch.multiprocessing
-torch.multiprocessing.set_sharing_strategy('file_system')
-
-from cli import launch_tui, get_parser, train, evaluate, inference, load_config
-
-from typing import Any
+from cli import launch_tui, train, evaluate, inference, load_config
 
 if __name__ == "__main__":
-    parser = get_parser()
+    parser = ArgumentParser(description="Base interface for training, evaluation and inference")
+    parser.add_argument(
+        "-c", 
+        "--config", 
+        type=str, 
+        dest="config_path", 
+        help="Path of configuration file"
+    )
+    parser.add_argument(
+        "-t", 
+        "--t", 
+        action="store_true", 
+        dest="train", 
+        help="Flag for train mode"
+    )
+    parser.add_argument(
+        "-e", 
+        "--evaluate", 
+        action="store_true", 
+        dest="evaluate", 
+        help="Flag for evaluation mode"
+    )
+    parser.add_argument(
+        "-d", 
+        "--dump-results", 
+        action="store_true", 
+        dest="dump_outputs", 
+        help="Flag for dumping test outputs object after test run"
+    )
+    parser.add_argument(
+        "-i", 
+        "--inference", 
+        action="store_true", 
+        dest="inference", 
+        help="Flag for inference mode"
+    )
+    parser.add_argument(
+        "-ic", 
+        "--inference-config", 
+        type=str, 
+        dest="inference_config_path", 
+        default=join("configs", "inference.yaml"),
+        help="Path of inference configuration file. Defaults to 'configs/inference.yaml''"
+    )
+    parser.add_argument(
+        "-it", 
+        "--interactive", 
+        action="store_true", 
+        default=False,
+        help="Flag for interactive inference mode"
+    )
+    parser.add_argument(
+        "-p",
+        "--prompt",
+        type=str,
+        dest="prompt",
+        default="the",
+        help="Prompt for inference mode",
+    )
+
     args = parser.parse_args()
     config = load_config(args.config_path)
 

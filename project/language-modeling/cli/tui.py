@@ -4,12 +4,12 @@ from threading import Thread
 from os.path import join
 
 from .loops import inference_step
-from .getters import load_config, load_lang, get_device, get_model
+from .getters import load_config, load_lang, get_model
 
 from typing import Any
 
 APP_NAME = "Language Modeling with LSTMs TUI"
-APP_VERSION = "v1.0"
+APP_VERSION = "v0.1"
 REPO = "https://github.com/filippodaniotti/NLU-UniTN-2022"
 INSTRUCTIONS = [
     "How to use:",
@@ -17,7 +17,7 @@ INSTRUCTIONS = [
     "* Hit <Enter> to flush the input buffer.",
     "* Hit <Backspace> to delete the character left to the cursor.",
     "* Type 't=' followed by a temperature value to set the temperature.",
-    "* Type 'quit' and press <Enter> to exit the application.",
+    "* Type 'quit' and press <Enter> to exit  the application.",
 ]
 
 INFO_Y_OFFSET = 7
@@ -26,9 +26,9 @@ SERVICE_WINDOW_Y_OFFSET = 7
 INPUT_WINDOW_Y_OFFSET = 5
 OUTPUT_WINDOW_Y_OFFSET = 3
 
-DELAY = 4
+DELAY = 5
 
-def display_text(stdscr, text, y_offset=0, attr=curses.A_NORMAL, left=False):
+def display_info(stdscr, text, y_offset=0, attr=curses.A_NORMAL, left=False):
     height, width = stdscr.getmaxyx()
     y = height // 2 + y_offset
     # centered by default
@@ -45,7 +45,56 @@ def display_in_subwin(window, text, cursor_x = None, attr=curses.A_NORMAL):
         window.move(0, cursor_x)
     window.refresh()
 
-def handle_input(key, buffer, output, counter, cursor_position, iw, temp):
+def init_stdscr(stdscr):
+    curses.curs_set(1)  
+    stdscr.clear()      
+    stdscr.refresh()    
+
+    display_info(stdscr, f"{APP_NAME}, {APP_VERSION}", -INFO_Y_OFFSET, curses.A_BOLD)
+    display_info(stdscr, f"{REPO}", -INFO_Y_OFFSET+2, curses.A_UNDERLINE)
+    for idx, line in enumerate(INSTRUCTIONS):
+        display_info(stdscr, line, -INFO_Y_OFFSET+5+idx, left=True)
+
+
+def handle_input(
+        key: int, 
+        buffer: str, 
+        output: str, 
+        delay_counter: int, 
+        cursor_x: int, 
+        iw: Any, 
+        temp: float,
+    ) -> tuple[str, str, int, int, bool, bool, float]:
+    """
+    Handles user input. Specifically, it handles the following events:
+    - Enter: 
+        * flush the input buffer
+        * if the buffer contains the string 'quit', exit the application
+        * if the buffer contains the string 't=', set the temperature to the 
+            value following the '=' 
+    - Backspace: delete the character left to the cursor
+    - Arrows: move the cursor left or right
+    - Printable characters: append them to the input buffer
+
+    Args:
+        key (int): the key pressed by the user
+        buffer (str): the input buffer
+        output (str): the output buffer
+        delay_counter (int): the delay counter for the asynchronous inference 
+        cursor_x (int): the cursor position in the input buffer
+        iw (Any): the input window
+        temp (float): the current temperature for the smoothing of the 
+            inference output
+
+    Returns:
+        str: the updated input buffer
+        str: the updated output buffer
+        int: the updated delay counter
+        int: the updated cursor position
+        bool: whether the user requested to exit the application
+        bool: whether the key pressed is a printable character
+        float: the updated temperature
+    """
     is_printable = False
     exit_requested = False
 
@@ -56,21 +105,21 @@ def handle_input(key, buffer, output, counter, cursor_position, iw, temp):
         if "t=" in buffer.lower():
             value = buffer.split("=")[1].strip()
             try:
-                temp = float(value)
+                temp = min(abs(float(value)), 1.0)
             except ValueError:
                 value = value.split(" ")[0]
-                temp = float(value)
+                temp = min(abs(float(value)), 1.0)
 
         buffer = ""
         output = ""
-        counter = 0
-        cursor_position = 0
+        delay_counter = 0
+        cursor_x = 0
 
     # Backspace
     elif key == curses.KEY_BACKSPACE or key == 127:
-        if cursor_position > 0:
-            buffer = buffer[:cursor_position - 1] + buffer[cursor_position:]
-            cursor_position -= 1
+        if cursor_x > 0:
+            buffer = buffer[:cursor_x - 1] + buffer[cursor_x:]
+            cursor_x -= 1
 
     # Arrows
     elif key == curses.KEY_RIGHT or key == 27:
@@ -78,88 +127,115 @@ def handle_input(key, buffer, output, counter, cursor_position, iw, temp):
         if next_key == 91:  # Check for escape sequence
             arrow_key = iw.getch()
             if arrow_key == 67:  # Right arrow
-                if cursor_position < len(buffer):
-                    cursor_position += 1
+                if cursor_x < len(buffer):
+                    cursor_x += 1
             elif arrow_key == 68:  # Left arrow
-                if cursor_position > 0:
-                    cursor_position -= 1
+                if cursor_x > 0:
+                    cursor_x -= 1
 
     # printable characters
     elif key >= 32 and key <= 126:
         is_printable = True
-        buffer = buffer[:cursor_position] + chr(key) + buffer[cursor_position:]
-        cursor_position += 1
-        counter += 1
+        buffer = buffer[:cursor_x] + chr(key) + buffer[cursor_x:]
+        cursor_x += 1
+        delay_counter += 1
 
-    return buffer, output, counter, cursor_position, exit_requested, is_printable, temp
+    return (buffer, output, delay_counter, cursor_x, 
+            exit_requested, is_printable, temp)
 
 
 def main(config: dict[str, Any], inf_config: dict[str, Any]) -> callable:
+    """
+    Closure for the main function of the TUI application.
 
-    device = get_device()
+    Args:
+        config (dict[str, Any]): the configuration for the model
+        inf_config (dict[str, Any]): the configuration for the inference
+
+    Returns:
+        callable: the main function of the TUI application
+    """
+    device = "cpu"
     lang = load_lang(join(*inf_config["lang_path"]))
     model = get_model(config, len(lang), train=False)
 
     def _main(stdscr):
         
-        curses.curs_set(1)  
-        stdscr.clear()      
-        stdscr.refresh()    
+        init_stdscr(stdscr)
 
-        display_text(stdscr, f"{APP_NAME}, {APP_VERSION}", -INFO_Y_OFFSET, curses.A_BOLD)
-        display_text(stdscr, f"{REPO}", -INFO_Y_OFFSET+2, curses.A_UNDERLINE)
-        for idx, line in enumerate(INSTRUCTIONS):
-            display_text(stdscr, line, -INFO_Y_OFFSET+4+idx, left=True)
-
-        # Input window
-        input_window = curses.newwin(1, curses.COLS - 2, curses.LINES - INPUT_WINDOW_Y_OFFSET, 1)
-        input_window.border()  # Draw a border around the input window
+        # Subwindows declaration
+        service_window = curses.newwin(1, curses.COLS - 2, 
+                                    curses.LINES - SERVICE_WINDOW_Y_OFFSET, 1)
+        output_window = curses.newwin(2, curses.COLS - 2, 
+                                    curses.LINES - OUTPUT_WINDOW_Y_OFFSET, 1)
+        input_window = curses.newwin(1, curses.COLS - 2, 
+                                    curses.LINES - INPUT_WINDOW_Y_OFFSET, 1)
+        input_window.border()  
         input_window.refresh()
 
-        # Temperature window
-        service_window = curses.newwin(1, curses.COLS - 2, curses.LINES - SERVICE_WINDOW_Y_OFFSET, 1)
-
-        # Output window
-        output_window = curses.newwin(2, curses.COLS - 2, curses.LINES - OUTPUT_WINDOW_Y_OFFSET, 1)
-
-        counter = 0
+        # Helper variables
+        temp = 1.0
         buffer = ""
         output = [""]
-        cursor_position = 0
+        cursor_x = 0
+        delay_counter = 0
         exit_requested = False
-        temp = 1.0
 
+        def _inf_wrapper(buffer: str, temp: float, output: list[str]) -> None:
+            """
+            Wrapper for the inference step. The output is passed as a list of
+            1 element as lists are mutable and can be passed by reference;
+            hence, it serves as a simple inter-thread communication channel.
 
-        def inference_wrapper(buffer, temp, output):
+            Args:
+                buffer (str): the input buffer
+                temp (float): the temperature for smoothing the inference output
+                output (list[str]): the output buffer
+            """
             output[0] = inference_step(model, buffer, lang, inf_config, temp, device)
             display_in_subwin(output_window, output[0], attr=curses.A_ITALIC)
             input_window.refresh()
-            return
 
         while True:
             key = input_window.getch()
-            buffer, output[0], counter, cursor_position, exit_requested, is_printable, temp = handle_input(
-                key, buffer, output[0], counter, cursor_position, input_window, temp)
+            buffer, output[0], delay_counter, cursor_x, exit_requested, is_printable, temp \
+                = handle_input(key, buffer, output[0], delay_counter, cursor_x, input_window, temp)
+            
             if exit_requested:
                 for i in range(3, 0, -1):
-                    display_in_subwin(service_window, f"Bye! Application is quitting in {i}...", 0, curses.A_STANDOUT)
+                    display_in_subwin(
+                        service_window, 
+                        f"Bye! Application is quitting in {i}...", 
+                        0, curses.A_STANDOUT)
                     time.sleep(1)
                 break
             
-            if len(buffer) > 0 and is_printable and (counter % DELAY == 0 or buffer[-1] == " "):
-                th = Thread(target=inference_wrapper, args=(buffer, temp, output))
+            # Execute inference asynchronously in a separate thread
+            # once every DELAY printable characters are pressed or 
+            # if the last character is a space
+            if len(buffer) > 0 and is_printable and \
+                    (delay_counter % DELAY == 0 or buffer[-1] == " "):
+                th = Thread(target=_inf_wrapper, args=(buffer, temp, output))
                 th.start()
-                counter = DELAY + 1 
-            elif counter < DELAY:
+                delay_counter = DELAY
+            elif delay_counter < DELAY:
                 output[0] = buffer
             
+            # Redraw subwindows
             display_in_subwin(output_window, output[0], attr=curses.A_ITALIC)
             display_in_subwin(service_window, f"T: {temp:.2f}")
-            display_in_subwin(input_window, buffer, cursor_position)
+            display_in_subwin(input_window, buffer, cursor_x)
 
     return _main
 
-def launch_tui(config: dict[str, Any], inf_config: dict[str, Any]):
+def launch_tui(config: dict[str, Any], inf_config: dict[str, Any]) -> None:
+    """
+    Launches the TUI application.
+
+    Args:
+        config (dict[str, Any]): the configuration for the model
+        inf_config (dict[str, Any]): the configuration for the inference
+    """
     curses.wrapper(main(config, inf_config))
 
 if __name__ == "__main__":
