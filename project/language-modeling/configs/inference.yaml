@@ -3,4 +3,9 @@ allow_unk: True
 max_length: 30
 lang_path: 
   - lang.pkl
-  
+temperatures:
+  - 1.0
+  - 0.8
+  - 0.75
+  - 0.7
+  - 0.5

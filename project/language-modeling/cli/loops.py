@@ -49,18 +49,29 @@ def evaluate(config: dict[str, Any], dump_outputs: bool | None):
 
     return pd.DataFrame(metrics, index=["Loss", "Perplexity"])
 
+def inference_step(
+        model: SequenceModelWrapper, 
+        prompt: str, 
+        lang: dict[str, int], 
+        inf_config: dict[str, Any],
+        temperature: float,
+        device: str):
+    return model.generate(
+        prompt, 
+        lang, 
+        mode=inf_config["mode"], 
+        max_len=inf_config["max_length"],
+        allow_unk=inf_config["allow_unk"],
+        temperature=temperature,
+        device=device)
+
 def inference(config: dict[str, Any], inf_config: dict[str, Any], prompt: str):
     lang = load_lang(join(*inf_config["lang_path"]))
     model = get_model(config, len(lang), train=False)
 
-    temperatures = [0.5, 0.7, 0.75, 0.8, 1.0]
-    for temp in temperatures:
-        generated = model.generate(
-            prompt, 
-            lang, 
-            mode=inf_config["mode"], 
-            max_len=inf_config["max_length"],
-            allow_unk=inf_config["allow_unk"],
-            temperature=temp,
-            device=get_device())
-        print(f"t:{temp} => {generated}")
+    out = ""
+    for temp in inf_config["temperatures"]:
+        generated = inference_step(model, prompt, lang, inf_config, temp, get_device())
+        out += f"T: {temp:.2f}\t=>\t{generated}\n"
+        
+    return out
