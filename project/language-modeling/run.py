@@ -16,6 +16,7 @@ import pytorch_lightning as pl
 import torch.multiprocessing
 torch.multiprocessing.set_sharing_strategy('file_system')
 
+import tui
 from data import PennTreebank, Lang
 from models import BaselineLSTM, MerityLSTM, MogrifierLSTM, SequenceModelWrapper
 
@@ -270,14 +271,10 @@ if __name__ == "__main__":
     if args.inference:
         inference_config = load_config(args.inference_config_path)
         if not args.interactive:
-            inference(config, inference_config, args.prompt)
+            generated = inference(config, inference_config, args.prompt)
+            print(generated)
         else:
-            try:
-                while True:
-                    prompt = input("Please provide a prompt: ")
-                    inference(config, inference_config, prompt)
-            except KeyboardInterrupt:
-                print("Exiting...")
+            tui.launch_tui(config, inference_config)
     if not any([args.train, args.evaluate, args.inference]):
         raise ValueError("Please provide a supported mode flag ('-t', '-e', '-i')")
     
