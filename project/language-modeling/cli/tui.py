@@ -4,7 +4,7 @@ from threading import Thread
 from os.path import join
 
 from .loops import inference_step
-from .getters import load_config, load_lang, get_model
+from .getters import load_lang, get_model
 
 from typing import Any
 
@@ -237,8 +237,3 @@ def launch_tui(config: dict[str, Any], inf_config: dict[str, Any]) -> None:
         inf_config (dict[str, Any]): the configuration for the inference
     """
     curses.wrapper(main(config, inf_config))
-
-if __name__ == "__main__":
-    config = load_config("configs/merity_ad_nohh_1024.yaml")
-    inf_config = load_config("configs/inference.yaml")
-    launch_tui(config, inf_config)
