@@ -1,11 +1,8 @@
 import curses
 from os.path import join
 
-try:
-    from run import inference, get_model, load_lang, load_config, get_device
-except ImportError:
-    import sys
-    HomePage = sys.modules[__package__ + 'run']
+from .loops import train, evaluate, inference
+from .getters import load_config, load_lang, get_device, get_model
 
 from typing import Any
 
