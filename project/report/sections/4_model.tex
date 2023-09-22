@@ -1,8 +1,57 @@
 \section{Model}
+\label{sec:4_model}
 % approx. 200-500 words
-\begin{itemize}
-    \item \textit{your network/ algorithm (do not spend too much text in explaining already existing models, focus on your solution),}
-    \item \textit{the pipeline if used any, including  tokenizer, featurizer, extractor, etc.}
-    \item \textit{Your baseline and the experiments you have tried}
-\end{itemize}
+% \begin{itemize}
+%     \item \textit{your network/ algorithm (do not spend too much text in explaining already existing models, focus on your solution),}
+%     \item \textit{the pipeline if used any, including  tokenizer, featurizer, extractor, etc.}
+%     \item \textit{Your baseline and the experiments you have tried}
+% \end{itemize}
  
+\subsection{Architecture}
+\label{sec:4_arch}
+We employed LSTMs as backbone architecture, as they outperform Vanilla RNNs and GRUs in caputirng long-term dependencies, which is a key feature for language modelling. The model features the folliwing components:
+\begin{itemize}
+    \item a \emph{word embedding} layer, which maps the input words to a sparse vector representation;
+    \item a \emph{recurrent LSTM} layer, which processes the sequence of embeddings and outputs a sequence of hidden states;
+    \item a \emph{fully-connected} layer, which maps the hidden states to a sequence of logits.
+\end{itemize}
+Specifically, we are presenting two different architectures:
+\begin{itemize}
+    \item \emph{Baseline LSTM}: a single-layer LSTM with \(300\) hidden units and a simple Dropout layer with \(p=0.5\);
+    \item \emph{Merity LSTM}: refined architecture featuring a set of regularization technique, which will be discussed later;
+    \item \emph{Mogrifier LSTM}: a variation of the previous architecture, featuring two Mogrifier LSTM layers.
+\end{itemize}
+
+\subsection{Pipeline}
+The complete experiment pipeline is structured as follows.
+\begin{enumerate}
+    \item \emph{Data loading}: the dataset is downloaded, extracted and loaded into memory.
+    \item \emph{Data pre-processing}: the dataset is pre-processed to be ready to be fed to the model. Specifically, the following operations are performed:
+    \begin{itemize} 
+        \item each sentence is tokenized by splitting on whitespaces;
+        \item a \texttt{<eos>} token is appended to each sentence;
+        \item the vocabulary mappings are created.
+    \end{itemize}
+    \item \emph{Data batching and  collation}: the dataset is batched to be fed to the model; specifically, the dataset is padded to the length of the longest sequence in the batch before the batch is collated to be fed to the model. Furthermore, the collate function can also perform the following operations depending on the model configuration:
+    \begin{itemize}
+        \item the sentences can be split into chunks of a fixed length to implement Truncated Backpropagation Through Time (TBPTT);
+        \item the sentences can be partially shuffled.
+    \end{itemize}
+    \item \emph{Model training}: the model is trained on the training set; we will also perform a validation epoch on the validation set in order to monitor the model learning behaviour and to tune the hyper-parameters.
+    \item \emph{Model evaluation}: the model is evaluated on the test set according to the evaluation metrics and pipeline (see \ref{sec:5_eval}).
+\end{enumerate}
+
+\subsection{Regularization}
+Sequence models are prone to overfitting, as they are trained on long sequences and they have to capture long-term dependencies. To cope with this problem, we employed the following regularization techniques suggested by \cite{merity2017regularizing}:
+\begin{itemize}
+    \item \emph{Variational Dropout}\cite{gal2016theoretically}: a dropout technique which drops the same units across time-steps, in order to ensure temporal consistency;
+    \item \emph{embedding Dropout}\cite{gal2016theoretically}: a dropout technique which drops the same embedding across time-steps;
+    \item \emph{DropConnect}\cite{wan2013dropconnect}: a dropout technique which drops the same weights across time-steps;
+    \item \emph{Weight Tying}\cite{press2017tying}: a technique which ties the weights of the embedding layer and the output layer, in order to reduce model parameters and to improve generalization;
+    \item \emph{Gradient Clipping}: a technique which clips the gradients to a maximum norm, in order to prevent gradient explosion;
+    \item \emph{Partial Shuffle}\cite{press2019partially}: a technique which rotates the sentences in a batch by a random offset, in order to improve generalization;
+\end{itemize}
+Additionally, we used \emph{Truncated Backpropagation Through Time} (TBPTT) to train the model. As suggested in \cite{merity2017regularizing}, we are using $k_1 = k_2 = k$, which means that we are splitting the sentences into chunks of a fixed length and backpropagating the error only through the chunks, which allows for a more efficient usage of training samples. However, we are using $30$ in place of $70$ as mean of the Gaussian from which to sample the split size. The motivation is to be found in the dataset statistics: the mean sentence length is around $20$, and the standard deviation is $10$, which means that the majority of the sentences are shorter than $30$ words and would not undergo any processing if $70$ was the mean of the Gaussian.
+
+\subsection{Optimization}
+We used mostly \emph{SGD} and its variation \emph{NT-ASGD}\cite{merity2017regularizing} as optimizers. We also performed some experiments with \emph{Adam}, but we did not observe any improvement in the model performance. 

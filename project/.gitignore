@@ -6,3 +6,7 @@ results*/
 tmp/
 *.pkl
 *_old.*
+.vscode/
+a.py
+b.py
+trits.py

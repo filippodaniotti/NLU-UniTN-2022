@@ -1,5 +1,6 @@
 
 \section{Evaluation}
+\label{sec:5_eval}
 % approx. 400-800 words
 % \begin{itemize}
 %     \item \textit{The metrics you used}
@@ -7,13 +8,17 @@
 %     \item \textit{Comparison and differences between you model and the baseline}
 %     \item \textit{Correct interpretation of errors and analysis}
 % \end{itemize}
-\paragraph*{Metrics}
-The main metric we used to compare and evaluate the models is the \emph{perplexity} (PP). The reason is that PP is a well understood and established metric and it correlates well enough with the real-world performances. Although the PP can be defined in multiple ways, in this work we are framing the learning problem as a multi-class classification problem; hence, it is convenient to use the definition of PP as the exponential of the cross-entropy (CE):
+\subsection{Metrics}
+The main metric we used to compare and evaluate the models is the \emph{perplexity} (PP). The reason is that PP is a well understood and established metric and it correlates well enough with the model performances on real-world tasks. Although the PP can be defined in multiple ways, in this work we are framing the learning problem as a multi-class classification problem; hence, it is convenient to use the definition of PP as the exponential of the cross-entropy (CE):
 \begin{equation}
     \text{PP}(f(x), y) = \exp{CE(f(x), y)}
 \end{equation}
 
 % Intuitively, the PP can be interpreted as the number of classes that the model is considering to make a prediction . 
-The $CE$ gives a measure of how much the model is uncertain about the prediction; hence, the PP can be interpreted as a measure of how many classes the model is considering to make a prediction (\emph{weighted branching factor}). The lower the PP, the less uncertain the model is on which word to predict, the better it is performing.
+The $CE$ gives a measure of how much the model is uncertain about the prediction; therefore, the PP can be interpreted as a measure of how many classes the model is considering to make a prediction (\emph{weighted branching factor}). The lower the PP, the less uncertain the model is on which word to predict, the better it is performing.
 
 Additionally, we are further evaluating the best-performing model to excerpt deeper insight in its behaviour. Specifically, we are considering \emph{average PP per sequence length}, \emph{per word predicted vs. target counts difference} and \emph{precision, recall} and \emph{F1 score} of the most and least occurring tokens. Lastly, we are giving a qualitative evaluation of the model by showing some examples of generated sequences.
+
+\subsection{Experiments}
+\subsection{Results}
+\subsection{Analysis}
