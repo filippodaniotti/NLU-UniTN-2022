@@ -7,6 +7,27 @@ from torch import tensor
 from typing import Any
 
 class SequenceCollator:
+    """
+    A collator class for data sequences used in DataLoader. It takes a list
+    of tuples, each containing input and target sequences along with their lengths, 
+    and prepares them for batch processing. Specifically, it:
+    - pads sequences with a given pad value
+    - optionally splits sequences for using TBPTT
+    - optionally partially shuffles sequences
+
+    Args:
+        pad_value (int, optional): The value to use for padding sequences. Default to 0.
+        tbptt (bool, optional): Whether to split sequences for TBPTT. Defaults to False.
+        tbptt_config (dict[str, Any], optional): Configuration for TBPTT.
+        part_shuffle (bool, optional): Whether to use Partial shuffle. Default to False.
+
+    Methods:
+        __call__(*args: Any, **kwargs: Any) -> Any: Wrapper for collate_fn.
+        collate_fn(data: list[tuple[tensor, tensor, int]]): Collates and processes input data.
+        get_split_step(): Calculates the split step for TBPTT.
+        tbptt_split_batch(inputs, targets): Splits batches for TBPTT training.
+        partial_shuffle(data, lengths): Partially shuffles input sequences.
+    """
     def __init__(
             self,
             pad_value: int = 0, 

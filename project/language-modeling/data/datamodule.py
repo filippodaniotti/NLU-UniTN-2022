@@ -13,6 +13,45 @@ from .dataset import SentsDataset
 from .collator import SequenceCollator
 
 class PennTreebank(pl.LightningDataModule):
+    """
+    PyTorch Lightning DataModule for the Penn Treebank dataset.
+    This DataModule:
+    - downloads and extracts the Penn Treebank dataset
+    - creates the Lang object for token-to-ID mappings
+    - creates the SentsDataset object for each split on demand
+    - creates a DataLoader for each split on demand
+
+    Args:
+        download_url (str): The URL to download the Penn Treebank dataset.
+        data_dir (str): The directory to store the dataset and extracted files.
+        temp_zip_name (str, optional): The temporary name of the downloaded zip file (default is "ptb.zip").
+        batch_size (int, optional): The batch size for DataLoader (default is 64).
+        tbptt (bool, optional): Whether to use truncated backpropagation through time (TBPTT) (default is False).
+        tbptt_config (dict[str, Any] | None, optional): Configuration for TBPTT (default is None).
+        pad_value (int, optional): The value to use for padding sequences (default is 0).
+
+    Attributes:
+        download_url (str): The URL to download the Penn Treebank dataset.
+        data_dir (str): The directory to store the dataset and extracted files.
+        temp_zip_name (str): The temporary name of the downloaded zip file.
+        batch_size (int): The batch size for DataLoader.
+        tbptt (bool): Whether to use truncated backpropagation through time (TBPTT).
+        tbptt_config (dict[str, Any] | None): Configuration for TBPTT.
+        vocab_size (int): The size of the vocabulary.
+        dataset (hf_datasets.DatasetDict | None): The Penn Treebank dataset.
+        lang (Lang | None): The language object for token-to-ID mappings.
+        ptb_train (SentsDataset | None): Dataset for training.
+        ptb_val (SentsDataset | None): Dataset for validation.
+        ptb_test (SentsDataset | None): Dataset for testing.
+
+    Methods:
+        prepare_data(): Prepares the Penn Treebank dataset.
+        setup(stage: str): Sets up training, validation, or testing datasets.
+        train_dataloader(): Returns a DataLoader for the training dataset.
+        val_dataloader(): Returns a DataLoader for the validation dataset.
+        test_dataloader(): Returns a DataLoader for the testing dataset.
+        _download_and_extract(ds_path: str, zip_path: str): Downloads and extracts the dataset files.
+    """
     def __init__(self,
             download_url: str,
             data_dir: str,
@@ -79,7 +118,6 @@ class PennTreebank(pl.LightningDataModule):
                 tbptt = self.tbptt,
                 tbptt_config = self.tbptt_config),
             num_workers=4)
-
 
     def val_dataloader(self):
         return DataLoader(

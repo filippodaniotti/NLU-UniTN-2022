@@ -1,6 +1,30 @@
 from collections import Counter
 
 class Lang():
+    """
+    Lang class for mapping tokens to integer IDs and vice versa.
+
+    Args:
+        elements (list[str]): The list of elements (words or sentences) to process.
+        pad_value (int, optional): The ID assigned to padding tokens.
+            Defaults to 0.
+        eos_token (int, optional): The ID assigned to the end-of-sentence token.
+            Default is None.
+        cutoff (int, optional): The frequency cutoff for tokens to be included in the Lang.
+            Default is 0.
+        parse_sents (bool, optional): Flatten elements (set to True if they are sentences).
+
+    Attributes:
+        words2ids (dict[str, int]): A dictionary mapping tokens to their corresponding integer IDs.
+        ids2words (dict[int, str]): A dictionary mapping integer IDs to their corresponding tokens.
+
+    Methods:
+        __len__(): Get the number of unique tokens in the vocabulary.
+        __getitem__(key: str | int): Get the ID for a token or the token for an ID.
+        map_tokens(words: list[str], pad_value: int, eos_token: int, cutoff: int = None):
+            Map tokens to integer IDs and vice versa.
+        flatten_sentences(sents: list[str]): Flatten a list of sentences into a list of words.
+    """
     def __init__(
             self, 
             elements,
@@ -29,9 +53,6 @@ class Lang():
             pad_value: int, 
             eos_token: int, 
             cutoff: int = None) -> tuple[dict[str, int], dict[int, str]]:
-        """
-        No need to tackle oov, there are none of them
-        """
         w2id, id2w = {}, {}
 
         w2id['<pad>'] = pad_value
