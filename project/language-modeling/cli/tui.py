@@ -1,6 +1,6 @@
 import time
 import curses
-from threading import Thread
+from threading import Thread, Event
 from os.path import join
 
 from .loops import inference_step
@@ -25,8 +25,6 @@ INSTRUCTIONS_X_OFFSET = 30
 SERVICE_WINDOW_Y_OFFSET = 7
 INPUT_WINDOW_Y_OFFSET = 5
 OUTPUT_WINDOW_Y_OFFSET = 3
-
-DELAY = 5
 
 def display_info(stdscr, text, y_offset=0, attr=curses.A_NORMAL, left=False):
     height, width = stdscr.getmaxyx()
@@ -60,7 +58,6 @@ def handle_input(
         key: int, 
         buffer: str, 
         output: str, 
-        delay_counter: int, 
         cursor_x: int, 
         iw: Any, 
         temp: float,
@@ -80,7 +77,6 @@ def handle_input(
         key (int): the key pressed by the user
         buffer (str): the input buffer
         output (str): the output buffer
-        delay_counter (int): the delay counter for the asynchronous inference 
         cursor_x (int): the cursor position in the input buffer
         iw (Any): the input window
         temp (float): the current temperature for the smoothing of the 
@@ -89,7 +85,6 @@ def handle_input(
     Returns:
         str: the updated input buffer
         str: the updated output buffer
-        int: the updated delay counter
         int: the updated cursor position
         bool: whether the user requested to exit the application
         bool: whether the key pressed is a printable character
@@ -112,7 +107,6 @@ def handle_input(
 
         buffer = ""
         output = ""
-        delay_counter = 0
         cursor_x = 0
 
     # Backspace
@@ -138,9 +132,8 @@ def handle_input(
         is_printable = True
         buffer = buffer[:cursor_x] + chr(key) + buffer[cursor_x:]
         cursor_x += 1
-        delay_counter += 1
 
-    return (buffer, output, delay_counter, cursor_x, 
+    return (buffer, output, cursor_x, 
             exit_requested, is_printable, temp)
 
 
@@ -174,57 +167,54 @@ def main(config: dict[str, Any], inf_config: dict[str, Any]) -> callable:
         input_window.refresh()
 
         # Helper variables
-        temp = 1.0
-        buffer = ""
+        temp = [1.0]
+        buffer = [""]
         output = [""]
         cursor_x = 0
-        delay_counter = 0
+        is_printable = [False]
         exit_requested = False
 
-        def _inf_wrapper(buffer: str, temp: float, output: list[str]) -> None:
-            """
-            Wrapper for the inference step. The output is passed as a list of
-            1 element as lists are mutable and can be passed by reference;
-            hence, it serves as a simple inter-thread communication channel.
+        # event for stopping the thread
+        stop_thread = Event()
 
-            Args:
-                buffer (str): the input buffer
-                temp (float): the temperature for smoothing the inference output
-                output (list[str]): the output buffer
+        def _inf_wrapper() -> None:
             """
-            output[0] = inference_step(model, buffer, lang, inf_config, temp, device)
-            display_in_subwin(output_window, output[0], attr=curses.A_ITALIC)
-            input_window.refresh()
+            Wrapper for the inference step. All the information is shared
+            leveraging the mutable lists defined above in the scope of the
+            main function. This is a simple workaround to enable
+            inter-thread communication.
+            """
+            while not stop_thread.is_set():
+                time.sleep(.5)
+                if len(buffer[0]) > 0 and is_printable[0]:
+                    output[0] = inference_step(model, buffer[0], lang, inf_config, temp[0], device)
+                    display_in_subwin(output_window, output[0], attr=curses.A_ITALIC)
+                    input_window.refresh()
+                    is_printable[0] = False
+
+        th = Thread(target=_inf_wrapper, args=())
+        th.start()
 
         while True:
             key = input_window.getch()
-            buffer, output[0], delay_counter, cursor_x, exit_requested, is_printable, temp \
-                = handle_input(key, buffer, output[0], delay_counter, cursor_x, input_window, temp)
+            buffer[0], output[0], cursor_x, exit_requested, is_printable[0], temp[0] \
+                = handle_input(key, buffer[0], output[0], cursor_x, input_window, temp[0])
             
             if exit_requested:
+                stop_thread.set()
                 for i in range(3, 0, -1):
                     display_in_subwin(
                         service_window, 
                         f"Bye! Application is quitting in {i}...", 
                         0, curses.A_STANDOUT)
                     time.sleep(1)
+                th.join()
                 break
-            
-            # Execute inference asynchronously in a separate thread
-            # once every DELAY printable characters are pressed or 
-            # if the last character is a space
-            if len(buffer) > 0 and is_printable and \
-                    (delay_counter % DELAY == 0 or buffer[-1] == " "):
-                th = Thread(target=_inf_wrapper, args=(buffer, temp, output))
-                th.start()
-                delay_counter = DELAY
-            elif delay_counter < DELAY:
-                output[0] = buffer
             
             # Redraw subwindows
             display_in_subwin(output_window, output[0], attr=curses.A_ITALIC)
-            display_in_subwin(service_window, f"T: {temp:.2f}")
-            display_in_subwin(input_window, buffer, cursor_x)
+            display_in_subwin(service_window, f"T: {temp[0]:.2f}")
+            display_in_subwin(input_window, buffer[0], cursor_x)
 
     return _main
 
