@@ -19,6 +19,7 @@ experiment:
   asgd_lr: 1
   gradient_clip_val: 0.25
   tbptt: False
+  part_shuffle: True
 
 model:
   embedding_dim: 1024

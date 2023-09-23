@@ -94,7 +94,7 @@ class SequenceCollator:
 
         return inputs, targets
     
-    def partial_shuffle(data, lengths):
+    def partial_shuffle(self, data, lengths):
         """
         Method from "Partially Shuffling the Training Data to Improve Language Models" by Ofir Press
         https://arxiv.org/abs/1903.04167
@@ -109,7 +109,10 @@ class SequenceCollator:
             shifted_inputs.append(
                 torch.cat((inp[split:], inp[:split])) #partial shuffle of a single row
             )
+            # shifted_targets.append(
+            #     torch.cat((tar[split:-1], torch.cat((inp[:split], tar[-1].unsqueeze(0))))) #ensure eos token is last item
+            # )
             shifted_targets.append(
-                torch.cat((tar[split:-1], torch.cat((inp[:split], tar[-1].unsqueeze(0))))) #ensure eos token is last item
+                torch.cat((tar[split:], tar[:split])) #ensure eos token is last item
             )
         return shifted_inputs, shifted_targets

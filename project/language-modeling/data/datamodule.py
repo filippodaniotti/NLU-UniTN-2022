@@ -59,6 +59,7 @@ class PennTreebank(pl.LightningDataModule):
             batch_size: int = 64,
             tbptt: bool = False,
             tbptt_config: dict[str, Any] | None = None,
+            part_shuffle: bool = False,
             pad_value: int = 0,):
         super().__init__()
         self.download_url = download_url
@@ -68,6 +69,7 @@ class PennTreebank(pl.LightningDataModule):
         self.pad_value = pad_value
         self.tbptt = tbptt
         self.tbptt_config = tbptt_config
+        self.part_shuffle = part_shuffle
 
         # placeholders
         self.vocab_size: int = -1
@@ -116,7 +118,8 @@ class PennTreebank(pl.LightningDataModule):
             collate_fn=SequenceCollator(
                 pad_value = self.pad_value,
                 tbptt = self.tbptt,
-                tbptt_config = self.tbptt_config),
+                tbptt_config = self.tbptt_config,
+                part_shuffle = self.part_shuffle,),
             num_workers=4)
 
     def val_dataloader(self):
