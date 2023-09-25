@@ -9,7 +9,7 @@ results:
 
 experiment:
   seed: 42
-  experiment_name: merity_ad_nohh_1024_adam
+  experiment_name: merity_ad_nohh_1024_tbptt
   epochs: 50
   batch_size: 128
   model: merity

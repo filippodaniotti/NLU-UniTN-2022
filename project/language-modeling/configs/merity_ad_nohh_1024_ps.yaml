@@ -9,7 +9,7 @@ results:
 
 experiment:
   seed: 42
-  experiment_name: merity_ad_nohh_1024
+  experiment_name: merity_ad_nohh_1024_ps
   epochs: 50
   batch_size: 128
   model: merity
@@ -19,11 +19,14 @@ experiment:
   asgd_lr: 1
   gradient_clip_val: 0.25
   tbptt: False
+  part_shuffle: True
 
 model:
   embedding_dim: 1024
   hidden_dim: 1024
   num_layers: 2
+  init_weights: True
+  tie_weights: True
   locked_dropout: True
   p_lockdrop: .65
   embedding_dropout: True
@@ -31,5 +34,3 @@ model:
   weight_dropout: True
   p_lstmdrop: .4
   p_hiddrop: .0
-  init_weights: True
-  tie_weights: True
