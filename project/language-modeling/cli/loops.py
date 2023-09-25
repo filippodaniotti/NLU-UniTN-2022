@@ -15,8 +15,16 @@ def train(config: dict[str, Any]):
     seed_everything(config["experiment"]["seed"])
     ptb = get_data_module(config)
     ptb.prepare_data() 
-    logger = get_logger(config)
-    trainer = pl.Trainer(max_epochs=config["experiment"]["epochs"], logger=logger)
+    callbacks = []
+    if config["experiment"].get("early_stopping", 0) > 0:
+        callbacks.append(pl.callbacks.EarlyStopping(
+            monitor="Loss/Valid", 
+            mode="min", 
+            patience=config["experiment"]["early_stopping"]))
+    trainer = pl.Trainer(
+        max_epochs=config["experiment"]["epochs"], 
+        logger=get_logger(config), 
+        callbacks=callbacks)
     model = get_model(config, ptb.vocab_size, train=True)
     trainer.fit(model=model, datamodule=ptb)
 

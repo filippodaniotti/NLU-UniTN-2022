@@ -9,7 +9,7 @@ import torch.nn as nn
 import pytorch_lightning as pl
 
 from data import PennTreebank, Lang
-from models import BaselineLSTM, MerityLSTM, MogrifierLSTM, SequenceModelWrapper
+from models import BaselineLSTM, MerityLSTM, SequenceModelWrapper
 
 from typing import Any
 
@@ -74,17 +74,6 @@ def get_model_core(config: dict[str, Any], vocab_size: int) -> nn.Module:
             tie_weights = bool(config["model"]["tie_weights"]),
             pad_value = config["dataset"]["pad_value"]
         )
-    elif config["experiment"]["model"] == "mogrifier":
-        return MogrifierLSTM(
-            num_classes = vocab_size,
-            embedding_dim = config["model"]["embedding_dim"],
-            hidden_dim = config["model"]["hidden_dim"],
-            num_layers = config["model"]["num_layers"],
-            mogrify_steps = config["model"]["mogrify_steps"],
-            tie_weights = bool(config["model"]["tie_weights"]),
-            p_dropout = config["model"]["p_dropout"],
-            pad_value = config["dataset"]["pad_value"]
-        )
     else:
         raise ValueError(f"Provided model '{config['experiment']['model']}' not available.")
 
@@ -121,6 +110,7 @@ def get_data_module(
         download_url = config["dataset"]["ds_url"],
         data_dir = config["dataset"]["ds_path"],
         pad_value = config["dataset"]["pad_value"],
+        part_shuffle = config["experiment"].get("part_shuffle", False),
         tbptt = bool(config["experiment"].get("tbptt", False)),
         tbptt_config = config["experiment"].get("tbptt_config", None),
         batch_size = batch_size,
