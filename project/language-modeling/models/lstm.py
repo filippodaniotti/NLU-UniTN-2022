@@ -1,7 +1,7 @@
 import numpy as np
 import torch.nn as nn
 
-from torch import tensor
+from torch import tensor, zeros
 
 class BaselineLSTM(nn.Module):
     def __init__(
@@ -46,3 +46,9 @@ class BaselineLSTM(nn.Module):
         preds = self.fc(outputs)
         preds = preds.reshape(-1, preds.shape[-1])
         return preds, (hidden, cell)
+    
+
+    def _init_hidden(self, batch_size, device):
+        hidden = zeros(self.num_layers, batch_size, self.hidden_dim, device=device)
+        cell = zeros(self.num_layers, batch_size, self.hidden_dim, device=device)
+        return hidden, cell

@@ -107,8 +107,3 @@ class MerityLSTM(BaselineLSTM):
                 elif type(m) in [nn.Linear]:
                     if m.bias != None:
                         m.bias.data.fill_(0.1)
-
-    def _init_hidden(self, batch_size, device):
-        hidden = zeros(self.num_layers, batch_size, self.hidden_dim, device=device)
-        cell = zeros(self.num_layers, batch_size, self.hidden_dim, device=device)
-        return hidden, cell
