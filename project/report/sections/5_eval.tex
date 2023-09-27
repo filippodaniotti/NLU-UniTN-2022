@@ -9,15 +9,27 @@
 %     \item \textit{Correct interpretation of errors and analysis}
 % \end{itemize}
 \subsection{Metrics}
-The main metric we used to compare and evaluate the models is the \emph{perplexity} (PP). The reason is that PP is a well understood and established metric and it correlates well enough with the model performances on real-world tasks. Although the PP can be defined in multiple ways, in this work we are framing the learning problem as a multi-class classification problem, where the classes to predict are the words in the vocabulary. Hence, it is convenient to use the definition of PP as the exponential of the cross-entropy (CE):
+In this work we are framing the learning problem as a multi-class classification problem, where the classes to predict are the words in the vocabulary. Hence, we are training the model to minimize the cross-entropy (CE) loss:
 \begin{equation}
-    \text{PP}(f(x), y) = \exp{CE(f(x), y)}
+    CE(f(x; \theta), y) = -\sum_{i=1}^{N} y_i \log{f(x; \theta)_i}
+\end{equation}
+where $f(x; \theta)$ is the model, $x$ is the input sequence, $y$ is the target sequence, $\theta$ is the set of model parameters and $N$ is the number of classes in the vocabulary. 
+
+The main metric we used to compare and evaluate the models is the \emph{perplexity} (PP). The reason is that PP is a well understood and established metric and it correlates well enough with the model performances on real-world tasks. Although the PP can be defined in multiple ways, it is convenient to use the definition of PP as the exponential of the cross-entropy (CE):
+\begin{equation}
+    \text{PP}(f(x; \theta), y) = \exp{CE(f(x; \theta), y)}
 \end{equation}
 
 % Intuitively, the PP can be interpreted as the number of classes that the model is considering to make a prediction . 
-The $CE$ gives a measure of how much the model is uncertain about the prediction; therefore, the PP can be interpreted as a measure of how many classes the model is considering to make a prediction (\emph{weighted branching factor}). The lower the PP, the less uncertain the model is on which word to predict, the better it is performing.
+While the $CE$ gives a measure of how much the model is uncertain about the prediction, the PP can be interpreted as a measure of how many classes the model is considering to make a prediction (\emph{weighted branching factor}). The lower the PP, the less uncertain the model is on which word to predict, the better it is performing.
 
 Additionally, we are further evaluating the best-performing model to excerpt deeper insights in its behaviour. Specifically, we are considering \emph{average PP per sequence length}, \emph{per word predicted vs. target counts difference} and \emph{precision, recall} and \emph{F1 score}. Lastly, we are giving a qualitative evaluation of the model by showing some examples of generated sequences.
 
 \subsection{Results}
+\begin{table}
+    \input{./assets/tables/results.tex}
+    \caption{Results (PP) of the experiments.}
+    \label{tab:results}
+\end{table}
+
 \subsection{Analysis}

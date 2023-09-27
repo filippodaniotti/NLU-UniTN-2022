@@ -15,10 +15,14 @@ Specifically, the original Penn Treebank has undergone a pre-processing pipeline
     \item no OOV words in \emph{validation} and \emph{test} sets with respect to the \emph{training} set.
 \end{itemize}
 
-\input{./assets/tables/statistics.tex}
+\begin{table}
+    \input{./assets/tables/statistics.tex}
+    \caption{Statistics of word-level Penn Treebank}
+    \label{tab:statistics}
+\end{table}
 
 \paragraph*{Statistics analysis}
-In Table \ref{tab:statistics} we are presenting a summary of the relevant statistics of the dataset.
+In Tab.\ref{tab:statistics} we are presenting a summary of the relevant statistics of the dataset.
 
 The PTB dataset appears to be balanced enough, as sents and words are evenly splitted and the mean and standard deviance \(\sigma\) of the words-per-sentence distribution are very similar, being around \(20\) and \(10\).
 

@@ -9,7 +9,7 @@
  
 \subsection{Architecture}
 \label{sec:4_arch}
-We employed LSTMs as backbone architecture, as they outperform Vanilla RNNs and GRUs in caputirng long-term dependencies, which is a key feature for language modelling. The model features the folliwing components:
+We employed LSTMs\cite{hochreiter1997lstm} as backbone architecture, as they outperform Vanilla RNNs and GRUs in caputirng long-term dependencies, which is a key feature for language modelling. The model features the following components:
 \begin{itemize}
     \item a \emph{word embedding} layer, which maps the input words to a sparse vector representation;
     \item a \emph{recurrent LSTM} layer, which processes the sequence of embeddings and outputs a sequence of hidden states;
@@ -37,7 +37,7 @@ The complete experiment pipeline is structured as follows.
         \item the sentences can be partially shuffled.
     \end{itemize}
     \item \emph{Model training}: the model is trained on the training set; we will also perform a validation epoch on the validation set in order to monitor the model learning behaviour and to tune the hyper-parameters.
-    \item \emph{Model evaluation}: the model is evaluated on the test set according to the evaluation metrics and pipeline (see \ref{sec:5_eval}).
+    \item \emph{Model evaluation}: the model is evaluated on the test set according to the evaluation metrics and pipeline (see Sec.\ref{sec:5_eval}).
 \end{enumerate}
 
 \subsection{Regularization}
@@ -51,14 +51,14 @@ Sequence models are prone to overfitting, as they are trained on long sequences 
     \item \emph{Gradient Clipping}: a technique which clips the gradients to a maximum norm, in order to prevent gradient explosion;
     \item \emph{Partial Shuffle}\cite{press2019partially}: a technique which rotates each sentence in a batch by a random offset, in order to improve generalization;
 \end{itemize}
-Additionally, we used \emph{Truncated Backpropagation Through Time} (TBPTT) to train the model. As suggested in \cite{merity2017regularizing}, we are using $k_1 = k_2 = k$, which means that we are splitting the sentences into chunks of a fixed length and backpropagating the error only through the chunks, which allows for a more efficient usage of training samples. Specifically, the split step $k$ is sampled from a Gaussian $\mathcal{N}(\textrm{seq}, \sigma^2)$ with probability $p$ and from $\mathcal{N}(\frac{\textrm{seq}}{2}, \sigma^2)$ with probability $1-p$. However, we are using $30$ in place of $70$ as value for $\textrm{seq}$. The motivation is to be found in the dataset statistics: the mean sentence length is around $20$, and the standard deviation is $10$, which means that the majority of the sentences are shorter than $30$ words and would not undergo any processing if $70$ was the mean of the Gaussian.
+Additionally, we used \emph{Truncated Backpropagation Through Time} (TBPTT) to train the model. As suggested in \cite{merity2017regularizing}, we are using $k_1 = k_2 = k$, which means that we are splitting the sentences into chunks of a fixed length and backpropagating the error only through the chunks, which allows for a more efficient usage of training samples. Specifically, the split step $k$ is sampled from a Gaussian $\mathcal{N}(\textrm{seq}, \sigma^2)$ with probability $p$ and from $\mathcal{N}(\frac{\textrm{seq}}{2}, \sigma^2)$ with probability $1-p$. However, we are using $30$ in place of $70$ as value for $\textrm{seq}$. The motivation is to be found in the dataset statistics. Recalling Tab.\ref{tab:statistics}, we know that the mean sentence length is around $20$, and the standard deviation is $10$, which means that the majority of the sentences are shorter than $30$ words and would not undergo any processing if $70$ was the mean of the Gaussian.
 
 \subsection{Optimization}
 We used mostly \emph{SGD} and its variation \emph{NT-ASGD}\cite{merity2017regularizing} as optimizers. We also performed some experiments with \emph{Adam}, but we did not observe any improvement in the model performance. We also employ a \emph{Learning Rate Scheduler} which reduces the learning rate by a factor of $0.5$ when the validation loss does not improve for $3$ epochs.
 
 \subsection{Experiments}
-Unless otherwise specified, we used a batch size of $128$ and we trained the models for $50$ epochs and used SGD with \emph{learning rate} $= 1$ and \emph{weight_decay} $=1\cdot 10^{-6}$. All the experiments were conducted on a NVIDIA GEForce RTX 3050 GPU with 4GB of VRAM.
+Unless otherwise specified, we used a batch size of $128$ and we trained the models for $50$ epochs and used SGD with \emph{learning rate} $= 1$ and \emph{weight decay} $=1\cdot 10^{-6}$. All the experiments were conducted on a NVIDIA GEForce RTX 3050 GPU with 4GB of VRAM.
 \paragraph*{Baseline} 
 We perfomerd a first experiment with the default configuration to set a baseline for our study. Then, before moving on to the refined architecture, we performed a second experiment were we simply add a \emph{Dropout} layer with $p=0.5$ after the LSTM layer. We also tried to use \emph{Adam} as optimizer, but we did not observe any improvement in the model performance.
-\paragraph{Merity LSTM}
+\paragraph*{Merity LSTM}
 This is our implementation of the AWD-LSTM model proposed in \cite{merity2017regularizing}. We decided to start by adding the dropout and regularization techniques individually and then combining them in different configurations, in order to understand their contribution and keep only the best performing ones in a greedy fashion. Subsequently, motivated by the fact that NN benefit for growing in depth in many tasks and that the aforementioned techniques proved to be able to present overfitting, we increased the size of the model by increasing the sizes of both the embedding and the hidden representation. Lastly, we picked the best performing model and we performed an extensive training experiment, where we let it train until the validation loss would stop decreasing.

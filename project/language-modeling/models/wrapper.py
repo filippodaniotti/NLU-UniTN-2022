@@ -76,13 +76,10 @@ class SequenceModelWrapper(pl.LightningModule):
     
 
     def on_train_epoch_end(self):
-        # try: 
         validation_loss = self.trainer.callback_metrics.get("Loss/Valid", None)
         if validation_loss:
             sch = self.lr_schedulers()
             sch.step(validation_loss)
-        # except KeyError:
-        #     pass
 
     def on_validation_start(self) -> None:
         self.outputs.clear()
@@ -127,7 +124,7 @@ class SequenceModelWrapper(pl.LightningModule):
             device: str = "cpu") -> str:
         
         if mode not in ["multinomial", "argmax"]:
-            raise ValueError("Please provide either 'multinomial' or 'argmax' as mode")        
+            mode = "argmax"        
             
         get_pred = lambda o, m: \
                         torch.argmax(o, dim=1)[-1] if m == "argmax"  \
