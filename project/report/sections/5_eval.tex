@@ -75,3 +75,12 @@ If we inspect the counts of predicted and target words in Tab.\ref{tab:diff_coun
     \caption{Per word predicted vs. target counts difference.}
     \label{tab:diff_counts}
 \end{table}
+
+Finally, we can get some interesting insights by looking at the f1-score in Tab.\ref{tab:f1}. Quite expectedly, given the huge size of the targets space and the nature of the task of language modelling, most of the classes have a rather low f1-score; this behaviour is particularly noticeable in the most common words, like \emph{<unk>} ($0.23$) and \emph{the} ($0.34$). However, it is interesting to notate than some very specific words score higher values. If we take a look at the words with highest f1-score with support $\ge 100$, we can see interesting examples like \emph{million} ($0.68$) and \emph{N} ($0.62$), which may indicate that the model was effective in learning where to place numbers and to phrase them together. Scores can get even higher if we reduce the support threshold to $\ge 10$: words that may appear in very specific phrasings show pretty interesting scores (\emph{angeles} ($0.95$), \emph{share} ($0.8$), \emph{estate} ($0.79$)).
+
+\begin{table}
+    \centering
+    \input{./assets/tables/f1.tex}
+    \caption{.}
+    \label{tab:f1}
+\end{table}
