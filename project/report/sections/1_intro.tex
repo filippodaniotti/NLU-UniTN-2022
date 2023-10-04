@@ -1,5 +1,11 @@
 \section{Introduction}
 % approx. 100 words
+This document is the final report for the course \emph{Natural Language Understanding} of the Master's Degree in Artificial Intelligence Systems at the University of Trento in the A.Y.2021/2022. The goal of the project is to implement a language model based on LSTMs\cite{hochreiter1997lstm} and to evaluate its performances on the word-level Penn Treebank\cite{marcus1993building} dataset and achieve a perplecity score $\le 90.7$. In this work:
 \begin{itemize}
-    \item \textit{brief  summary of what you have done}
+    \item we analyzed the dataset;
+    \item we implemented and trained a baseline LSTM model and a refined regularized LSTM model;
+    \item we fine-tuned the refined model and improved it with additional regularization techniques from the literature;
+    \item we evaluated the models and performed an in-depth analysis of the best performing model behaviour;
+    \item we created a TUI application to easily interact with the model and use it to generate sentences.
 \end{itemize}
+The final model achieved a perplexity score of $79.86$ on the test set. The code for this project is available at \url{https://github.com/filippodaniotti/NLU-UniTN-2022}
