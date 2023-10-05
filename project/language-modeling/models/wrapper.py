@@ -15,6 +15,101 @@ from typing import Any
 from torch import tensor
 
 class SequenceModelWrapper(pl.LightningModule):
+    """
+    PyTorch Lightning module that serves as a wrapper for LSTM-based language models.
+
+    Args:
+        model (nn.Module): The LSTM model.
+        cost_function (nn.Module): The cost function (loss) used for training.
+        learning_rate (float, optional): The learning rate for the optimizer (default is 0.1).
+        momentum (float, optional): The momentum for the optimizer (default is 0.9).
+        optimizer (str, optional): The optimizer to use, either 'sgd' or 'adam' (default is 'sgd').
+        ntasgd (int, optional): Number of epochs of non-improving valid loss after which NT-ASGD is triggered 
+                                (default is -1, meaning it's not used).
+        asgd_lr (float, optional): Learning rate for ASGD when switching to NT-ASGD (default is None).
+        tbptt (bool, optional): Whether to use TBPTT as training algorithm (default is False).
+        batch_size (int, optional): The batch size to use (default is 128).
+        evaluate (bool, optional): Flag for evaluation mode (default is False).
+
+    Attributes:
+        model (nn.Module): The LSTM model.
+        cost_fn (nn.Module): The cost function (loss) used for training.
+        lr (float): The learning rate for the optimizer.
+        momentum (float): The momentum for the optimizer.
+        batch_size (int): The batch size to use.
+        pad_value (int): The padding value used in the model.
+        optimizer (str): The optimizer used for training ('sgd' or 'adam').
+        ntasgd (int): Number of epochs of non-improving valid loss after which NT-ASGD is triggered.
+        ntasgd_trigger (bool): Indicates whether NT-ASGD has been triggered.
+        asgd_lr (float): Learning rate for ASGD when switching to NT-ASGD.
+        validation_step_loss (list[float]): Losses recorded during validation steps.
+        validation_epochs_loss (list[float]): Losses recorded at the end of validation epochs.
+        tbptt (bool): Whether truncated backpropagation through time (TBPTT) is used.
+        automatic_optimization (bool): Whether Pytorch Lightning automatic optimization is enabled.
+        evaluate (bool): Flag for evaluation mode.
+        outputs (list[dict]): Collected evaluation outputs.
+
+    Methods:
+        forward(inputs, lengths, hidden=None, split_idx=0):
+            Forward pass of the model.
+
+        training_step(batch, batch_idx):
+            Training step of the model. It has a different implementation
+            depending on whether TBPTT is used or not:
+                - forward_wrapper() if not TBPTT
+                - tbptt_forward_wrapper() if TBPTT
+
+        on_validation_start():
+            Callback at the start of validation.
+
+        validation_step(batch, batch_idx):
+            Validation step of the model.
+
+        on_validation_epoch_end():
+            Callback at the end of validation epoch. It checks:
+                - whether NT-ASGD should be triggered
+                - whether the learning rate scheduler should step
+
+        on_test_start():
+            Callback at the start of testing.
+
+        test_step(batch, batch_idx):
+            Testing step of the model.
+
+        generate(prompt, lang, max_len=30, mode="argmax", allow_unk=False, temperature=1.0, device="cpu"):
+            Generate a sentence based on the model's predictions.
+
+        configure_optimizers():
+            Configure optimizer and learning rate scheduler.
+
+        forward_wrapper(inputs, targets, lengths):
+            Wrapper for forward pass during training, validation and testing.
+
+        tbptt_forward_wrapper(inputs, targets, lengths):
+            Wrapper for TBPTT forward pass during training.
+
+        _print_metrics(loss, stage):
+            Print and log loss metrics.
+
+        _collect_outputs(inputs, targets, lengths, outputs, loss):
+            Collect evaluation outputs.
+
+        _switch_to_asgd():
+            Switch to NT-ASGD optimizer.
+
+        _init_hidden(batch_size, device):
+            Initialize hidden states for the model.
+
+        _detach_hidden(hiddens):
+            Detach hidden states to break computation graph when using TBPTT.
+
+        dump_outputs(outputs, filename):
+            Dump collected evaluation outputs to a file.
+
+        load_model(checkpoint_path, map_location, model, cost_function, batch_size=1):
+            Load a trained model from a checkpoint.
+
+    """
     def __init__(
             self,
             model: nn.Module,
@@ -73,13 +168,6 @@ class SequenceModelWrapper(pl.LightningModule):
         loss, _ = forward_step(inputs, targets, lengths)
         self._print_metrics(loss.item(), "Train")
         return loss
-    
-
-    def on_train_epoch_end(self):
-        validation_loss = self.trainer.callback_metrics.get("Loss/Valid", None)
-        if validation_loss:
-            sch = self.lr_schedulers()
-            sch.step(validation_loss)
 
     def on_validation_start(self) -> None:
         self.outputs.clear()
@@ -100,6 +188,12 @@ class SequenceModelWrapper(pl.LightningModule):
             # if not improving
             if self.validation_epochs_loss[-1] > min(self.validation_epochs_loss[:-self.ntasgd]):
                 self._switch_to_asgd()
+
+        # Scheduler step
+        validation_loss = self.trainer.callback_metrics.get("Loss/Valid", None)
+        if validation_loss:
+            sch = self.lr_schedulers()
+            sch.step(validation_loss)
     
     def on_test_start(self) -> None:
         self.outputs.clear()

@@ -12,6 +12,8 @@ APP_NAME = "Language Modeling with LSTMs TUI"
 APP_VERSION = "v0.1"
 REPO = "https://github.com/filippodaniotti/NLU-UniTN-2022"
 INSTRUCTIONS = [
+    "Model: ",
+    "",
     "How to use:",
     "* Type a prompt to generate a text.",
     "* Hit <Enter> to flush the input buffer.",
@@ -20,7 +22,7 @@ INSTRUCTIONS = [
     "* Type 'quit' and press <Enter> to exit  the application.",
 ]
 
-INFO_Y_OFFSET = 7
+INFO_Y_OFFSET = 9
 INSTRUCTIONS_X_OFFSET = 30
 SERVICE_WINDOW_Y_OFFSET = 7
 INPUT_WINDOW_Y_OFFSET = 5
@@ -43,13 +45,15 @@ def display_in_subwin(window, text, cursor_x = None, attr=curses.A_NORMAL):
         window.move(0, cursor_x)
     window.refresh()
 
-def init_stdscr(stdscr):
+def init_stdscr(stdscr, model_name):
     curses.curs_set(1)  
     stdscr.clear()      
     stdscr.refresh()    
 
     display_info(stdscr, f"{APP_NAME}, {APP_VERSION}", -INFO_Y_OFFSET, curses.A_BOLD)
     display_info(stdscr, f"{REPO}", -INFO_Y_OFFSET+2, curses.A_UNDERLINE)
+
+    INSTRUCTIONS[0] += model_name
     for idx, line in enumerate(INSTRUCTIONS):
         display_info(stdscr, line, -INFO_Y_OFFSET+5+idx, left=True)
 
@@ -112,6 +116,7 @@ def handle_input(
     # Backspace
     elif key == curses.KEY_BACKSPACE or key == 127:
         if cursor_x > 0:
+            is_printable = True
             buffer = buffer[:cursor_x - 1] + buffer[cursor_x:]
             cursor_x -= 1
 
@@ -154,7 +159,7 @@ def main(config: dict[str, Any], inf_config: dict[str, Any]) -> callable:
 
     def _main(stdscr):
         
-        init_stdscr(stdscr)
+        init_stdscr(stdscr, config["experiment"]["experiment_name"])
 
         # Subwindows declaration
         service_window = curses.newwin(1, curses.COLS - 2, 

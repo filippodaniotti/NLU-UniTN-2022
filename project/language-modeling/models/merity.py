@@ -6,6 +6,45 @@ from .lstm import BaselineLSTM
 from .dropout import LockedDropout, WeightDropLSTM, EmbeddingDropout
 
 class MerityLSTM(BaselineLSTM):
+    """
+    PyTorch module implementing the AWD-LSTM model proposed in Merity et al. 
+    https://arxiv.org/abs/1708.02182
+
+    Args:
+        num_classes (int): The number of output classes.
+        embedding_dim (int): The dimension of the word embeddings.
+        hidden_dim (int): The dimension of the hidden LSTM layers.
+        num_layers (int, optional): The number of LSTM layers (default is 1).
+        pad_value (int, optional): The value of the padding token (default is 0).
+        locked_dropout (bool, optional): Flag for locked dropout (default is False).
+        p_lockdrop (float): Probability of dropout for locked dropout (default is 0.4).
+        embedding_dropout (bool, optional): Flag for apply embedding dropout (default is False).
+        p_embdrop (float): Probability of dropout for embedding dropout (default is 0.1).
+        weight_dropout (bool, optional): Flag for apply weight dropout (default is False).
+        p_lstmdrop (float): Probability of dropout for LSTM layers (default is 0.3).
+        p_hiddrop (float): Probability of dropout for hidden-to-hidden matrices (default is 0.5).
+        init_weights (bool, optional): Flag for weights initialization (default is False).
+        tie_weights (bool, optional): Flag for weight tying on embedding and fully connected layers (default is False).
+
+    Attributes:
+        num_layers (int): The number of LSTM layers.
+        hidden_dim (int): The dimension of the hidden LSTM layers.
+        embedding_dim (int): The dimension of the input word embeddings.
+        pad_value (int, optional): The value of the padding token.
+        embedding (nn.Embedding | EmbeddingDropout): The embedding layer.
+        lstm (nn.LSTM | WeightDropLSTM): The LSTM layers.
+        locked_dropout (bool): Whether locked dropout is applied.
+        in_locked_dropout (LockedDropout, optional): Input locked dropout layer (if locked_dropout is True).
+        out_locked_dropout (LockedDropout, optional): Output locked dropout layer (if locked_dropout is True).
+
+    Methods:
+        forward(inputs, lengths, hiddens=None, split_idx=0):
+            Forward pass of the model.
+
+        _init_weights(mat):
+            Initialize the model weights.
+
+    """
     def __init__(
             self,
             num_classes: int,
@@ -29,10 +68,10 @@ class MerityLSTM(BaselineLSTM):
             num_layers,
             pad_value,)
 
-        if embedding_dropout > .0:
+        if embedding_dropout:
             self.embedding = EmbeddingDropout(num_classes, embedding_dim, pad_value, dropout=p_embdrop)
 
-        if weight_dropout > .0:
+        if weight_dropout:
             self.lstm = nn.LSTM(
                 embedding_dim,
                 hidden_dim,
@@ -47,9 +86,6 @@ class MerityLSTM(BaselineLSTM):
         if locked_dropout:
             self.in_locked_dropout = LockedDropout(p = p_lockdrop)
             self.out_locked_dropout = LockedDropout(p = p_lockdrop)
-
-        self.embedding_dropout = embedding_dropout
-        self.p_embdrop = p_embdrop
 
         if tie_weights:
             assert embedding_dim == hidden_dim, 'cannot tie, check dims'

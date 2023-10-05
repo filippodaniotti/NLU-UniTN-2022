@@ -88,7 +88,7 @@ This section is dedicated to the analysis of the best performing model, \texttt{
 We can see that the model is able to generate sequences that are roughly syntactically correct. However, the generated sequences are not semantically solid. This is probably due to the fact that the model is not able to learn the meaning of the words, but only their distribution in the sequences. Moreover, it seems that the model has consistent performances on shorter sequences and that it struggles more on longer sequences. This is also visible on the average PP per sequence length, as in Fig.\ref{fig:avg_pp_per_seq_len}: sentences of length shorter than $40$ tokens cause the model to score $60 \le PP \le 100$, slightly increasing as the length decreases. On the other hand, sentences of length longer than $40$ tokens have PP scores as high as $160$ and as low as $20$.
 \begin{figure}[htb]
     \centering
-    \includegraphics[width=.85\textwidth]{./assets/images/ppl_by_len}
+    \includegraphics[width=.815\textwidth]{./assets/images/ppl_by_len}
     \caption{Average PP per sequence length.}
     \label{fig:avg_pp_per_seq_len}
 \end{figure}

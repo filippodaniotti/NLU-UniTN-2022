@@ -81,7 +81,9 @@ if __name__ == "__main__":
             generated = inference(config, inference_config, args.prompt)
             print(generated)
         else:
+            print("Launching TUI application...")
             launch_tui(config, inference_config)
+            print("Quitting TUI application...")
     if not any([args.train, args.evaluate, args.inference]):
         raise ValueError("Please provide a supported mode flag ('-t', '-e', '-i')")
     
