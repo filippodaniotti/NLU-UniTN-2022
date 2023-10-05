@@ -61,9 +61,9 @@ It is worth noting that we decided to scrap \emph{Weight Dropout} on the hidden-
         {\includegraphics[width=.3\textwidth]{./assets/images/tl_merity_wd}}\hskip2em
 
     \ffigbox[\FBwidth]{
-        \caption{Average PP per sequence length.}
-        \label{fig:avg_pp_per_seq_len}}
-        {\includegraphics[width=.3\textwidth]{./assets/images/ppl_by_len}}
+        \caption{Impact of larger model size and partial shuffle.}
+        \label{fig:tl_merity_1024_ps}}
+        {\includegraphics[width=.3\textwidth]{./assets/images/tl_merity_1024_ps}}
     \end{floatrow}
     \end{figure*}
 
@@ -86,12 +86,12 @@ This section is dedicated to the analysis of the best performing model, \texttt{
 \end{itemize}
 
 We can see that the model is able to generate sequences that are roughly syntactically correct. However, the generated sequences are not semantically solid. This is probably due to the fact that the model is not able to learn the meaning of the words, but only their distribution in the sequences. Moreover, it seems that the model has consistent performances on shorter sequences and that it struggles more on longer sequences. This is also visible on the average PP per sequence length, as in Fig.\ref{fig:avg_pp_per_seq_len}: sentences of length shorter than $40$ tokens cause the model to score $60 \le PP \le 100$, slightly increasing as the length decreases. On the other hand, sentences of length longer than $40$ tokens have PP scores as high as $160$ and as low as $20$.
-% \begin{figure}[htb]
-%     \centering
-%     \includegraphics[width=.35\textwidth]{./assets/images/ppl_by_len}
-%     \caption{Average PP per sequence length.}
-%     \label{fig:avg_pp_per_seq_len}
-% \end{figure}
+\begin{figure}[htb]
+    \centering
+    \includegraphics[width=.35\textwidth]{./assets/images/ppl_by_len}
+    \caption{Average PP per sequence length.}
+    \label{fig:avg_pp_per_seq_len}
+\end{figure}
 
 If we inspect the counts of predicted and target words in Tab.\ref{tab:diff_counts}, we can see that the model heavily relies on the most present words in the dataset: the 5 most guessed words make up over $50\%$ of the total predictions, while the 5 most present words in the target sequences make up only $20\%$ of the total target words. All of the 10 most guessed words are over-represented in the predictions, except \texttt{and} - roughly on par - and \texttt{in} - which shows a slightly negative difference. Quite interestingly, the fact that the \texttt{<eos>} token is over-represented may indicate that the model has not learned when it is most appropriate to terminate a sentence. 
 
