@@ -49,3 +49,12 @@ ENV/
 env.bak/
 venv.bak/
 
+# project specific
+penn_treebank/
+lightning_logs/
+*.zip
+runs*/
+results*/
+*.pkl
+*_old.*
+.vscode/
