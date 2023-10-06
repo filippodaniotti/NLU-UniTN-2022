@@ -11,7 +11,13 @@ from models import SequenceModelWrapper
 
 from typing import Any
 
-def train(config: dict[str, Any]):
+def train(config: dict[str, Any]) -> None:
+    """
+    Train a PyTorch Lightning model using the provided configuration.
+
+    Args:
+        config (dict[str, Any]): Dictionary containing the full experiment configuration.
+    """
     seed_everything(config["experiment"]["seed"])
     ptb = get_data_module(config)
     ptb.prepare_data() 
@@ -28,7 +34,22 @@ def train(config: dict[str, Any]):
     model = get_model(config, ptb.vocab_size, train=True)
     trainer.fit(model=model, datamodule=ptb)
 
-def evaluate(config: dict[str, Any], dump_outputs: bool | None):
+def evaluate(config: dict[str, Any], dump_outputs: bool | None) -> pd.DataFrame:
+    """
+    Evaluate a PyTorch Lightning model using the provided configuration.
+    It behaviors differently depending on the value of `dump_outputs`:
+        - If `dump_outputs` is `False`, the model is evaluated on both
+            the validation and test sets and no output is dumped.
+        - If `dump_outputs` is `True`, the evaluation epoch is performed
+            only on the test set andthe model outputs are dumped to a file.
+
+    Args:
+        config (dict[str, Any]): Dictionary containing the full experiment configuration.
+        dump_outputs (bool | None): Whether to dump the model outputs to a file.
+
+    Returns:
+        pd.DataFrame: Dataframe containing the evaluation metrics.
+    """
     # disable device information logging
     logging.getLogger("pytorch_lightning").setLevel(logging.ERROR)
     ptb = get_data_module(config, batch_size=1)
@@ -63,7 +84,22 @@ def inference_step(
         lang: dict[str, int], 
         inf_config: dict[str, Any],
         temperature: float,
-        device: str):
+        device: str
+    ) -> str:
+    """
+    Wrapper function for the inference step.
+
+    Args:
+        model (SequenceModelWrapper): The model to be used for inference. 
+        prompt (str): The prompt to be fed to the model
+        lang (dict[str, int]): The Lang object to be used for the word mappings.
+        inf_config (dict[str, Any]): The inference configuration
+        temperature (float): The temperature to be used for the logits smoothing.
+        device (str): The device on which to load the model.
+
+    Returns:
+        str: The generated sequence.
+    """
     return model.generate(
         prompt, 
         lang, 
@@ -73,7 +109,24 @@ def inference_step(
         temperature=temperature,
         device=device)
 
-def inference(config: dict[str, Any], inf_config: dict[str, Any], prompt: str):
+def inference(
+        config: dict[str, Any], 
+        inf_config: dict[str, Any], 
+        prompt: str
+    ) -> str:
+    """
+    Standard inference mode. It uses the model to generate n sequences,
+    where n is the number of temperature values provided in the
+    inf_config dictionary.
+
+    Args:
+        config (dict[str, Any]): Dictionary containing the full experiment configuration.
+        inf_config (dict[str, Any]): The inference configuration
+        prompt (str): The prompt to be fed to the model.
+
+    Returns:
+        str: The generated sequence(s).
+    """
     lang = load_lang(join(*inf_config["lang_path"]))
     model = get_model(config, len(lang), train=False)
 
