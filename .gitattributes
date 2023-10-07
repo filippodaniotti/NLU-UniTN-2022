@@ -1,2 +1,3 @@
 notebooks/*.ipynb linguist-documentation
 report/IEEEtran/** linguist-vendored
+configs/*.yaml linguistic-language=python # workaround for pushing up python against jupyter notebooks in language counts
