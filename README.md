@@ -1,5 +1,5 @@
 # Adopting and improving LSTMs as language models
-This repository containes the code for the final project for the course *Natural Language Understanding*, held at the University of Trento in the A.Y. 2021/2022. The goal of the project is to implement a *language model* based on LSTMs and to evaluate its performances on the word-level Penn Treebank dataset and achieve a perplexity score $\le$ 90.7. 
+This repository containes the code for the final project for the course *Natural Language Understanding*, held at the University of Trento in the A.Y. 2021/2022. The goal of the project is to implement a *language model* based on LSTMs and to evaluate its performances on the word-level Penn Treebank dataset and achieve a perplexity score $\le$ 90.7.  
 
 In this work:
 - we analyzed the dataset;
@@ -8,7 +8,9 @@ In this work:
 - we evaluated the models and performed an in-depth analysis of the best performing model behavior;
 - we created a TUI application to easily interact with the model and use it to generate sentences.
 
-The final model achieved a perplexity score of 79.86 on the test set. For further detailes, check the [project report](report/main.pdf).
+The final model achieved a perplexity score of 79.86 on the test set. For further detailes, check the [project report](./static/main.pdf).
+
+![tui](./static/tui.gif)
 
 ## How to run
 The `run.py` script is the main API for interacting for this project. It also takes care of data download and preparation. Keep in mind the a configuration file is always required for it to run (see [here](#configuration) for details). 
@@ -68,6 +70,46 @@ python3 run.py -c configs/merity_ad_nohh_1024_ps_long.yaml -i -p "the price"
 ```bash
 python3 run.py -c configs/merity_ad_nohh_1024_ps_long.yaml -i -it
 ```
+
+## Notebooks
+| Notebook | Content |
+| --- | --- |
+| [dataset_analysis](notebooks/dataset_analysis.ipynb) | Analysis of the word-level Penn Treebank dataset. | 
+| [training_logs](notebooks/training_logs.ipynb) | Plots of training and validation curves. It requires the results to be parsed with the [`prepare_results.py` tool](#prepare_resultspy). | 
+| [evaluation_logs](notebooks/evaluation_logs.ipynb) | Results of evaluation runs. | 
+| [results_analysis](notebooks/results_analysis.ipynb) | In-depth analysis of the best-performing model performance and behaviour. It requires the [pickle object containing the outputs of the test run](#dump-outputs) of the model to be analyzed. |
+
+## Tools
+### `dump_lang.py`
+The `dump_lang.py` script dumps the Lang object as a pickle. The Lang object provides access to the word mappings and it is required a dump of it in order to run [inference](#inference).
+```bash
+python3 tools/dump_lang.py lang.pkl
+```
+### `prepare_results.py`
+```bash
+python3 tools/prepare_results.py -l runs -d results
+```
+In this project we use the Pytorch Lightning implementation of a Tensorboard logger. The `prepare_results.py` takes the directory of the logs (e.g. `logs/`) of $n$ in the `TensorBoardLogger` directory structure and transforms them into a new folder (e.g. `results/`) in the following format:
+```text
+results
+├── csv
+│   ├── experiment_1.csv
+│   └── ...
+├── tensorboard
+│   ├── experiment_1
+│   │   └── events.out.tfevents.1693748462.MSI.22648.0
+│   └── ...
+│       └── ...
+└── weights
+    ├── experiment_1.ckpt
+    └── ...
+```
+- `csv`: contains the logs of the experiment(s) converted to the csv format
+- `tensorboard`: contains the logs of the experiment(s) in the original Tensorboard format
+- `weights`: contains the state dictionary of the model of the given experiment at the best validation loss value
+
+The `results/` directory may also contain a `outputs/` subdirectory, which is generated from the [evaluation with dump outputs](#dump-outputseval) and contains the pickle objects of the outputs of test run of the given model.
+
 
 ## Configuration
 ### Experiment configuration
@@ -138,41 +180,3 @@ temperatures:
   - 0.5
 ```
 
-## Notebooks
-| Notebook | Content |
-| --- | --- |
-| [dataset_analysis](notebooks/dataset_analysis.ipynb) | Analysis of the word-level Penn Treebank dataset. | 
-| [training_logs](notebooks/training_logs.ipynb) | Plots of training and validation curves. It requires the results to be parsed with the [`prepare_results.py` tool](#prepare_resultspy). | 
-| [evaluation_logs](notebooks/evaluation_logs.ipynb) | Results of evaluation runs. | 
-| [results_analysis](notebooks/results_analysis.ipynb) | In-depth analysis of the best-performing model performance and behaviour. It requires the [pickle object containing the outputs of the test run](#dump-outputs) of the model to be analyzed. |
-
-## Tools
-### `dump_lang.py`
-The `dump_lang.py` script dumps the Lang object as a pickle. The Lang object provides access to the word mappings and it is required a dump of it in order to run [inference](#inference).
-```bash
-python3 tools/dump_lang.py lang.pkl
-```
-### `prepare_results.py`
-```bash
-python3 tools/prepare_results.py -l runs -d results
-```
-In this project we use the Pytorch Lightning implementation of a Tensorboard logger. The `prepare_results.py` takes the directory of the logs (e.g. `logs/`) of $n$ in the `TensorBoardLogger` directory structure and transforms them into a new folder (e.g. `results/`) in the following format:
-```text
-results
-├── csv
-│   ├── experiment_1.csv
-│   └── ...
-├── tensorboard
-│   ├── experiment_1
-│   │   └── events.out.tfevents.1693748462.MSI.22648.0
-│   └── ...
-│       └── ...
-└── weights
-    ├── experiment_1.ckpt
-    └── ...
-```
-- `csv`: contains the logs of the experiment(s) converted to the csv format
-- `tensorboard`: contains the logs of the experiment(s) in the original Tensorboard format
-- `weights`: contains the state dictionary of the model of the given experiment at the best validation loss value
-
-The `results/` directory may also contain a `outputs/` subdirectory, which is generated from the [evaluation with dump outputs](#dump-outputseval) and contains the pickle objects of the outputs of test run of the given model.
