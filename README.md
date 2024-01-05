@@ -1,4 +1,4 @@
-# Adopting and improving LSTMs as language models
+# Adopting LSTMs as language models
 This repository containes the code for the final project for the course *Natural Language Understanding*, held at the University of Trento in the A.Y. 2021/2022. The goal of the project is to implement a *language model* based on LSTMs and to evaluate its performances on the word-level Penn Treebank dataset and achieve a perplexity score $\le$ 90.7.  
 
 In this work:
@@ -13,7 +13,9 @@ The final model achieved a perplexity score of 79.86 on the test set. For furthe
 ![tui](./static/tui.gif)
 
 ## How to run
-The `run.py` script is the main API for interacting for this project. It also takes care of data download and preparation. Keep in mind the a configuration file is always required for it to run (see [here](#configuration) for details). 
+> Nota: the training logs and trained models weights of the experiments performed are attached to the release of this repository. 
+
+The `run.py` script is the main API for interacting for this project. It also takes care of data download and preparation. Keep in mind that a configuration file is always required for it to run (see [here](#configuration) for details). 
 
 ```text
 usage: run.py [-h] [-c CONFIG_PATH] [-t] [-e] [-d] [-i] [-ic INFERENCE_CONFIG_PATH] [-it] [-p PROMPT]
